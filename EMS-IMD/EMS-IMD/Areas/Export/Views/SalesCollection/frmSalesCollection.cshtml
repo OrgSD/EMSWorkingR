@@ -1,0 +1,322 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+
+<script>
+    $(document).ready(function () {
+
+        EventPermission();
+        $('#btnReset').click(function () {
+            ResetData();
+        });
+
+        /************************************
+        ********POP UP Shipment GRID*********
+        *************************************
+        *************************************/
+
+        /// Creating POP UP For the Invoice Grid To Load
+        var PopupWindowInvoice = $("#PopupWindowInvoice").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+
+        /// On Key pressing event in Invoice Selection Field
+        $("#CommInvoiceNo").on('keyup keypress keydown dblclick', function (e) {
+            PopupWindowInvoice.open();
+            PopupWindowInvoice.center();
+            $.ajax({
+                url: '/SalesCollection/GetCommercialInvoiceForCollection',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridInvoice').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindowInvoice.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+
+        /// Creating GRID For Loading Invoice Information
+        var PopupGridInvoice = $('#PopupWindowGridInvoice').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "CommInvoiceNo",
+                        fields: {
+                            CommInvoiceNo: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "CommInvFinalMstSl", hidden:true },
+                 { field: "CommInvoiceNo", title: "Invoice No" },
+                 { field: "CommInvoiceDate", title: "Invoice Date" },
+                 { field: "NetInvAmount", hidden:true },
+            ]
+
+        }).data('kendoGrid');
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridInvoice').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#CommInvFinalMstSl').val(selectRow.CommInvFinalMstSl);
+            $('#CommInvoiceNo').val(selectRow.CommInvoiceNo);
+            $('#CommInvoiceDate').val(selectRow.CommInvoiceDate);
+            $('#TotalInvoiceAmt').val(selectRow.NetInvAmount);
+            GetPreviousData(selectRow.CommInvFinalMstSl);
+            PopupWindowInvoice.close();
+        });
+
+        $("#CollAmount").on('keyup keypress keydown', function (e) {
+            if (parseFloat($('#CollAmount').val()) > (parseFloat($('#RemainingAmt').val()) - parseFloat($('#BankCharge').val()))) {
+                alert("Invalid Collection Amount");
+                $('#CollAmount').val("0");
+                $('#BankCharge').val("0");
+                $('#TotalPayable').val(parseFloat($('#RemainingAmt').val()));
+            }
+            else {
+                $('#TotalPayable').val(parseFloat($('#RemainingAmt').val()) - parseFloat($('#CollAmount').val()) - parseFloat($('#BankCharge').val()));
+            }
+        });
+
+
+        $("#BankCharge").on('keyup keypress keydown', function (e) {
+            if (parseFloat($('#CollAmount').val()) > (parseFloat($('#RemainingAmt').val()) - parseFloat($('#BankCharge').val()))) {
+                alert("Invalid Collection Amount");
+                $('#CollAmount').val("0");
+                $('#BankCharge').val("0");
+                $('#TotalPayable').val(parseFloat($('#RemainingAmt').val()));
+            }
+            else {
+                $('#TotalPayable').val(parseFloat($('#RemainingAmt').val()) - parseFloat($('#CollAmount').val()) - parseFloat($('#BankCharge').val()));
+            }
+        });
+
+        function GetPreviousData(CommInvSlNo)
+        {
+            $.ajax({
+                url: '/SalesCollection/GetPreviousAmount',
+                method: 'get',
+                dataType: 'json',
+                data: { CommlInvoiceMstNo: CommInvSlNo },
+                success: function (data) {
+                    if (data != "") {
+                        $('#PrevRecv').val(data[0].PrevRecv);
+                        $('#PrevBank').val(data[0].PrevBank);
+                        $('#RemainingAmt').val(parseFloat($('#TotalInvoiceAmt').val()) - parseFloat(data[0].PrevBank) - parseFloat(data[0].PrevRecv));
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+            });
+        }
+
+
+        /************************************
+        ********* Bank Dropdown List ********
+        *************************************
+        *************************************/
+
+        GetBankInfo();
+        function GetBankInfo() {
+            $.ajax({
+                url: '/BankInfo/GetBankInfo',
+                method: 'get',
+                dataType: 'json',
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#BankCode').append($('<option>', { value: item.BankCode, html: item.BankName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+        $('#btnSave').click(function () {
+            var Input = InputValidation('CommInvoiceNo') + InputValidation('SalesCollSlDate') + InputValidation('CollAmount') + InputValidation('BankCharge') + InputValidation('FdbcNo') + InputValidation('FdbcDate') + InputValidation('BankCode');
+
+            if (Input == 0) {
+                master.SalesCollSlNo = $('#SalesCollSlNo').val();
+                master.SalesCollDate = $('#SalesCollDate').val();
+                master.CommInvoiceNo = $('#CommInvoiceNo').val();
+                master.CommInvoiceDate = $('#CommInvoiceDate').val();
+                master.BuyerCode = $('#BuyerCode').val();
+                master.CollAmount = $('#CollAmount').val();
+                master.BankCharge = $('#BankCharge').val();
+                master.FdbcNo = $('#FdbcNo').val();
+                master.FdbcDate = $('#FdbcDate').val();
+                master.BankCode = $('#BankCode').val();
+
+                $.ajax({
+                    url: '/SalesCollection/OperationsMode',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.Status == "Yes") {
+                            $("#SalesCollSlNo").val(data.ID);
+                            OperationMsg(data.Mode);
+                        }
+                        else {
+                            ErrorFrmServerMsg(data.Status);
+                        }
+
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+            else {
+                ValidationMsg();
+            }
+
+        });
+        var master = { "SalesCollSlNo": "", "SalesCollDate": "", "CommInvoiceNo": "", "CommInvoiceDate": "", "BuyerCode": "", "CollAmount": "", "BankCharge": "", "FdbcNo": "", "FdbcDate": "", "BankCode": "", };
+
+    });
+</script>
+<div class="box-header with-border">
+    <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+    <div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+        <div style="text-align:right;">
+            <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>
+            <button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Save</button>
+            <button id="btnView" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-search"></i>Search</button>
+        </div>
+    </div>
+</div>
+<div class="panel panel-success">
+    <div class="panel-body">
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Comercial Invoice No:</div>
+                <div class="col-lg-3">
+                    <input type="hidden" id="CommInvoiceFinalMstSlNo" name="CommInvoiceFinalMstSlNo" class="form-control" />
+                    <input type="text" id="CommInvoiceNo" name="CommInvoiceNo" class="form-control RequiredField" placeholder="Press F9">
+                </div>
+                <div class="col-lg-3">Comercial Invoice Date:</div>
+                <div class="col-lg-3">
+                    <input type="text" id="CommInvoiceDate" name="CommInvoiceDate" readonly="readonly" class="form-control">
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Total Invoice Amount: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="TotalInvoiceAmt" name="TotalInvoiceAmt" readonly="readonly" class="form-control" /></div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Previously Received Amount: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="PrevRecv" name="PrevRecv" readonly="readonly" class="form-control" />
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Remaining Amount: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="RemainingAmt" name="RemainingAmt" readonly="readonly" class="form-control" />
+                </div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Previously Paid Bank Charge: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="PrevBank" name="PrevBank" readonly="readonly" class="form-control" />
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="panel panel-success">
+    <div class="panel-body">
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3"> Collection Date:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3"><input type="text" id="SalesCollSlDate" name="SalesCollSlDate" class="date RequiredField form-control" /></div>
+                <div class="col-xs-6 col-sm-6 col-md-3 col-lg-3"><input type="text" id="SalesCollSlNo" name="SalesCollSlNo" readonly="readonly" class="form-control" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Collected Amount: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="CollAmount" name="CollAmount" class="RequiredField form-control" /></div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Bank Charge: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="BankCharge" name="BankCharge" class="RequiredField form-control" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3"> FDBC No:</div>
+                <div class="col-xs-6 col-sm-6 col-md-3 col-lg-3"><input type="text" id="FdbcNo" name="FdbcNo" class="RequiredField form-control" /></div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3"> FDBC Date:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3"><input type="text" id="FdbcDate" name="FdbcDate" class="date form-control" /></div>
+
+            </div>
+        </div>
+
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Bank Name: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <select id="BankCode" class="form-control RequiredField ddlBox"></select>
+                </div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3"> Total Payable:</div>
+                <div class="col-xs-6 col-sm-6 col-md-3 col-lg-3"><input type="text" id="TotalPayable" readonly="readonly" name="TotalPayable" class="form-control" /></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="box-footer">@*Form Footer*@</div>
+<div class="row">
+    <div id="PopupWindow" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGrid" class="PopUpGrid"></div>
+    </div>
+
+    <div id="PopupWindowInvoice" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridInvoice" class="PopUpGrid"></div>
+    </div>
+</div>

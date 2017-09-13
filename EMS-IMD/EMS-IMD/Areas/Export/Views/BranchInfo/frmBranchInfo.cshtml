@@ -1,0 +1,373 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+
+<script type="text/javascript">
+
+    var changeStatus = 0;
+
+    $(document).ready(function () {
+        $.ajaxSetup({
+            beforeSend: function () {
+                $("#divLoading").show();
+            },
+            complete: function () {
+                $("#divLoading").hide();
+            }
+        });
+
+        EventPermission();
+        $('#btnReset').click(function () {
+
+            //$("#STATUS").val("Active");
+           // $(".ddlBox").val("Active");
+            ResetData();
+           // location.reload();
+        });
+
+        $('#btnView').click(function () {
+
+            PopupWindow.open();
+
+            $.ajax({
+                url: '/BranchInfo/GetBranchInfo',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGrid').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+                //complete: function () { },
+            });
+
+        });
+
+
+        //Initializing Main page details Kendo Grid Colums
+        var PopupGrid = $('#PopupWindowGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "SoftwareID",
+                        fields: {
+                            BankCode: { type: "string" },
+                            BankName: { type: "string" },
+                            BranchName: { type: "string" },
+                            BranchAddress: { type: "string" },
+                            Status: { type: "string" }
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            //selectable: "multiple",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            // groupable: true,
+            groupable: { messages: { empty: "List" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "BankCode ", title: "Bank Code", width: 80 },
+                 { field: "BankName ", title: "Bank Name", width: 100 },
+                 //{ field: "BranchCode ", title: "Branch Code", width: 80 },
+                 { field: "BranchName ", title: "Branch Name", width: 80 },
+                 { field: "BranchAddress ", title: "Branch Address", width: 80 },
+                 { field: "Status", title: "Status", width: 80 }
+
+            ]
+
+        }).data('kendoGrid');
+
+        $('#PopupWindowGrid').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+            var selectRow = grid.dataItem(grid.select());
+            PopupWindow.close();
+            SetMasterData(selectRow);
+            //$("#SUStatus").val(1);
+
+
+        });
+
+        //Produc Name twise Filter table row
+        $("#txtPopupInput").keyup(function () {
+            var val = $(this).val();
+            $("#PopupWindowGrid").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "BankCode ", title: "Bank Code", width: 80 },
+                 { field: "BankName ", title: "Bank Name", width: 100 },
+                 { field: "BranchCode ", title: "Branch Code", width: 80 },
+                 { field: "BranchName ", title: "Branch Name", width: 80 },
+                 { field: "BranchAddress ", title: "Branch Address", width: 80 },
+                 { field: "Status", title: "Status", width: 80 }
+                ]
+            });
+        });
+
+
+        //********************************************** Bank POP UP Window ****************************************************
+
+        //Function For Batch List Information Window
+        var BankPopupWindow = $("#BankPopupWindow").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+        //Open PopUp by pressing F9 key
+        
+        $("#BankName").on('keyup keypress keydown dblclick', function (e) {
+
+                    $.ajax({
+                        url: '/BankInfo/GetBankInfo',
+                        method: 'get',
+                        data: 'json',
+                        success: function (data) {
+                            if (data != "") {
+                                $('#BankPopupWindowGrid').data('kendoGrid').dataSource.data(data);
+                            }
+                            else {
+                                //CountryPopupWindow.close();
+
+                                AcknowledgeMsg();
+                            }
+
+                        },
+                        error: function () {
+                            alert('Error occured!');
+                        },
+                        //complete: function () { },
+                    });
+                    BankPopupWindow.open();
+                    
+        });
+
+
+        //Initializing Main page details Kendo Grid Colums
+        var PopupGrid = $('#BankPopupWindowGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "SoftwareID",
+                        fields: {
+                            BankCode: { type: "string" },
+                            BankName: { type: "string" }
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            //selectable: "multiple",
+            toolbar: [{ template: "<input type='text' id='txtBankPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            // groupable: true,
+            groupable: { messages: { empty: "List" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "BankCode", title: "Bank Code", width: 80 },
+                 { field: "BankName", title: "Bank Name", width: 100 }
+                 //{ field: "SHORT_NAME", title: "Short Name", width: 80 },
+                 //{ field: "Status", title: "Status", width: 80 }
+
+            ]
+
+        }).data('kendoGrid');
+
+
+
+        $('#BankPopupWindowGrid').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+            var selectRow = grid.dataItem(grid.select());
+            $("#BankCode").val(selectRow.BankCode);
+            $("#BankName").val(selectRow.BankName);
+            BankPopupWindow.close();
+            //SetMasterData(selectRow);
+            //$("#SUStatus").val(1);
+
+
+        });
+
+        //Produc Name twise Filter table row
+        $("#txtBankPopupInput").keyup(function () {
+            var val = $(this).val();
+            $("#BankPopupWindowGrid").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "BankCode", operator: "contains", value: val },
+                     { field: "BankName", operator: "contains", value: val },
+                    //{ field: "SHORT_NAME", operator: "contains", value: val }
+                   // { field: "Status", title: "Status", width: 80 }
+                ]
+            });
+        });
+
+
+
+
+        //********************************************** End of Bank POP UP Window ****************************************************
+
+        //************************* To Chech UNSAVED Data in Details GRID ******************************//
+
+        $('#btnSave').click(function () {
+            var Input = InputValidation('BankName') + InputValidation('BranchName') + InputValidation('Status');
+         
+            if (Input == 0) {
+                master.BankCode = $('#BankCode').val();
+                master.BranchCode = $('#BranchCode').val();
+                master.BranchName = $('#BranchName').val();
+                master.BranchAddress = $('#BranchAddress').val();
+                //master.BranchName = $('#BranchName').val();
+                master.Status = $('#Status').val();
+
+                $.ajax({
+                    url: '/BranchInfo/OperationsMode',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.Status == "Yes") {
+                            $("#BranchCode").val(data.ID);
+                            OperationMsg(data.Mode);
+                        }
+                        else {
+                            ErrorFrmServerMsg(data.Status);
+                        }
+
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+            else {
+                ValidationMsg();
+            }
+
+        });
+
+        var master = { "BankCode": "", "BranchCode": "", "BranchName": "", "BranchAddress": "", "Status": "" };
+
+    });
+
+    // ///////////////////////////  End of Ready function ..... /////////////
+
+</script>
+
+
+
+<div class="box-header with-border">
+    @*Form Title*@
+    <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+    <div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+        <div style="text-align:right;">
+            <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>
+            <button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Save</button>
+            <button id="btnView" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-search"></i>View</button>
+        </div>
+    </div>
+</div>
+<div class="box-body">
+    <div class="form-group">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Bank Name :</div>
+        <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+            <input type="text" id="BankName" name="BankName" class="form-control RequiredField" placeholder="Press f9">
+            <input type="hidden" id="BankCode" name="BankCode" class="form-control">
+        </div>
+   
+            @*<div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">
+            </div>*@
+        <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+            <input type="hidden" id="BranchCode" name="BranchCode" class="form-control RequiredField" placeholder="Branch Code" disabled>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+        <div class="row">
+            <div class="col-lg-3">Branch Address :</div>
+            <div class="col-lg-8">      
+                <textarea name="BranchAddress" id="BranchAddress" class="form-control RequiredField" placeholder="Branch Address"></textarea>
+            </div>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Branch Name :</div>
+            <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                <input type="text" id="BranchName" name="BranchName" class="form-control RequiredField" placeholder="Branch Name">
+            </div>
+        </div>
+    </div>
+    <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Status :</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <select id="Status" class="form-control ddlBox">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+<div class="box-footer">@*Form Footer*@</div>
+<div class="row">
+    <div id="PopupWindow" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGrid" class="PopUpGrid"></div>
+    </div>
+</div>
+
+<div class="row">
+    <div id="BankPopupWindow" class="PopupWindowLayout" style="display: none;">
+        <div id="BankPopupWindowGrid" class="PopUpGrid"></div>
+    </div>
+</div>
+
+
+
+
+<div id="divLoading" style="margin: 0px; padding: 0px; position: fixed; right: 0px;top: 0px; width: 100%; height: 100%; background-color:silver; z-index:10001;opacity: .8; filter: alpha(opacity=70);display:none">
+    <p style="position: absolute; top: 50%; left: 50%; color: White;"><img src="~/Content/Images/loading1.gif" /> </p>
+</div>

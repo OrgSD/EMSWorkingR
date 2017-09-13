@@ -1,0 +1,473 @@
+﻿
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+
+<script>
+    $(document).ready(function () {
+
+        EventPermission();
+        $('#btnReset').click(function () {
+            ResetData();
+            $('#MainGrid').data('kendoGrid').dataSource.filter([]);
+            $('#MainGrid').data('kendoGrid').dataSource.data([]);
+        });
+
+        /************************************
+        **** Document Type Dropdown List ****
+        *************************************
+        *************************************/
+
+        getDocumentNames();
+        function getDocumentNames() {
+            $.ajax({
+                url: '/General/GetDocumentType',
+                method: 'get',
+                dataType: 'json',
+                data: {formType: "Regulatory"},
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#DocName').append($('<option>', { value: item.DocName, html: item.DocName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+         /************************************
+         ********POP UP Shipment GRID*********
+         *************************************
+         *************************************/
+
+        /// Creating POP UP For the Shipment Grid To Load
+        var PopupWindowShipment = $("#PopupWindowShipment").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+
+        /// On Key pressing event in Shipment Selection Field
+        $("#ShipmentMstSlNo").on('keyup keypress keydown dblclick', function (e) {
+            PopupWindowShipment.open();
+            PopupWindowShipment.center();
+            $.ajax({
+                url: '/ShipmentInfo/GetShipmentForRegulatory',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridShipment').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+
+        /// Creating GRID For Loading Shipment Information
+        var PopupGridShipment = $('#PopupWindowGridShipment').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "ShipmentMstSlNo",
+                        fields: {
+                            ShipmentMstSlNo: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "ShipmentMstSlNo", title: "Shipment No" },
+                 { field: "ShipmentDate", title: "Shipment Date" },
+                 { field: "CommInvoiceNo", title: "Invoice No" },
+                 { field: "CommInvoiceDate", title: "Invoice Date" },
+                 { field: "BuyerName", title: "Buyer Name" },
+                 { field: "BuyerCode", hidden: true },
+                 { field: "CountryName", title: "Country" },
+            ]
+
+        }).data('kendoGrid');
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridShipment').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#ShipmentMstSlNo').val(selectRow.ShipmentMstSlNo);
+            $('#ShipmentDate').val(selectRow.ShipmentDate);
+            $('#CommInvoiceNo').val(selectRow.CommInvoiceNo);
+            $('#CommInvoiceDate').val(selectRow.CommInvoiceDate);
+            $('#BuyerName').val(selectRow.BuyerName);
+            $('#BuyerCode').val(selectRow.BuyerCode);
+            $('#CountryName').val(selectRow.CountryName);
+            PopupWindowShipment.close();
+        });
+
+
+       /************************************
+       *************Main GRID*************
+       *************************************
+       ************************************/
+
+        //Initializing Main page Mains Kendo Grid Colums
+        var MainGrid = $('#MainGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "DocumentName",
+                        fields: {
+                            DocumentName: { type: "string"},
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            navigatable: false,
+            height: 230,
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "RegDocDtlSlNo", hidden: true },
+                 { field: "RegDocMstSlNo", hidden: true },
+                 { field: "DocumentName", title: "Name", width: 80 },
+                 { field: "DocumentRemarks", title: "Remarks", width: 80 },
+                 { field: "DocRef", hidden: true },                 
+                 { command: [{ name: "DeletedRow", text: "Delete", imageClass: "k-icon k-i-close", click: handleDocDelete }], title: "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Delete", width: "70px", headerAttributes: { "class": "gridHeader", style: "font-weight: bold;font-size: 13px;text-align: center" } }
+            ]
+
+        }).data('kendoGrid');
+
+
+        //************************* Handling DELETE event for DELETING ROW from Main GRID ******************************//
+        var dataitem = {};
+        var GridName = null;
+        function handleDocDelete(event) {
+            var GridView = $("#MainGrid").data("kendoGrid");
+            dataitem = (GridView.dataItem(GridView.select()));
+            GridName = MainGrid;
+            RemoveConfirmationMain.open();
+        };
+
+        var RemoveConfirmationMain = $('#RemoveConfirmationMainWindow').kendoWindow({
+            width: "400px",
+            height: "100px",
+            draggable: false,
+            modal: true,
+            title: "Do You Want To Remove This Record?"
+        }).data("kendoWindow").center();
+
+
+        ////Handling Yes button click for master Delete Confirmation[Yes Button]
+        $('#btnRemoveConfirmationMainYes').click(function () {
+            MainGrid.dataSource.remove(dataitem);
+            RemoveConfirmationMain.close();
+            OperationMsg();
+        });
+
+        //Handling No button click for grid row Delete Confirmation[No Button]
+        $('#btnRemoveConfirmationMainNo').click(function () {
+            dataitem = {};
+            RemoveConfirmationMain.close();
+        });
+
+        $('#DocFile').on('change', function (e) {
+
+            var Input = InputValidation('DocName');
+
+            if (Input == 0) {
+                var files = e.target.files;
+                //var myID = 3; //uncomment this to make sure the ajax URL works
+                if (files.length > 0) {
+                    if (window.FormData !== undefined) {
+                        var data = new FormData();
+                        for (var x = 0; x < files.length; x++) {
+                            data.append("file" + x, files[x]);
+                        }
+                        $.ajax({
+                            type: "POST",
+                            url: '/RegulatoryDocument/UploadDoc',
+                            contentType: false,
+                            processData: false,
+                            data: data,
+                            success: function (result) {
+                                //$('#PaymentAdviceScanRef').val(result);
+                                //alert($('#PaymentAdviceScanRef').val());
+                                MainGrid.dataSource.add({ DocumentName: $('#DocName').val(), DocumentRemarks: $('#DocRemarks').val(), DocRef: result });
+                            },
+                            error: function (xhr, status, p3, p4) {
+                                var err = "Error " + " " + status + " " + p3 + " " + p4;
+                                if (xhr.responseText && xhr.responseText[0] == "{")
+                                    err = JSON.parse(xhr.responseText).Message;
+                                console.log(err);
+                            }
+                        });
+                    } else {
+                        alert("This browser doesn't support HTML5 file uploads!");
+                    }
+                }
+            }
+        });
+
+        $('#btnSave').click(function () {
+
+            var Input = InputValidation('ShipmentMstSlNo');
+
+            if (Input == 0) {
+
+                master.RegDocMstSlNo = $('#RegDocMstSlNo').val();
+                master.ShipmentMstSlNo = $('#ShipmentMstSlNo').val();
+                master.ShipmentDate = $('#ShipmentDate').val();
+                master.CommInvoiceNo = $('#CommInvoiceNo').val();
+                master.CommInvoiceDate = $('#CommInvoiceDate').val();
+                master.BuyerCode = $('#BuyerCode').val();
+         
+                var PageDetailsdts = $("#MainGrid").data("kendoGrid").dataSource;
+                data = PageDetailsdts.data(); // Get Detail Grid Data
+                master.RegDocList = [];
+                if (PageDetailsdts.hasChanges) {
+                    for (var i = data.length - 1; i >= 0; i--) {
+
+                        details.RegDocDtlSlNo = data[i].RegDocDtlSlNo;
+                        details.RegDocMstSlNo = data[i].RegDocMstSlNo;
+                        details.DocumentName = data[i].DocumentName;
+                        details.Remarks = data[i].DocumentRemarks;
+                        details.DocRef = data[i].DocRef;
+                       
+                        master.RegDocList.push(details);
+                        details = { "RegDocDtlSlNo": "", "RegDocMstSlNo": "", "DocumentName": "", "Remarks": "", "DocRef": "" };
+                    }
+                }
+                else {
+                    ValidationMsg();
+                }
+                $.ajax({
+                    url: '/RegulatoryDocument/OperationsMode',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                            $("#RegDocMstSlNo").val(data.ID);
+                            OperationMsg(data.Mode);
+                           // ErrorFrmServerMsg(data.Status);
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+        });
+
+        var master = { "RegDocMstSlNo": "", "ShipmentMstSlNo": "", "ShipmentDate": "", "CommInvoiceNo": "", "CommInvoiceDate": "", "BuyerCode": "", "RegDocList": [] };
+        var details = { "RegDocDtlSlNo": "", "RegDocMstSlNo": "", "DocumentName": "", "Remarks": "", "DocRef": ""};
+
+        /************************************
+       *********POP UP LOADING GRID*********
+       *************************************
+       *************************************/
+
+        $('#btnView').click(function () {
+            PopupWindow.open();
+            $.ajax({
+                url: '/RegulatoryDocument/GetRegulatoryList',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGrid').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+                //complete: function () { },
+            });
+        });
+
+        //Initializing Main page details Kendo Grid Colums
+        var PopupGrid = $('#PopupWindowGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "ProductCode",
+                        fields: {
+                            ProductCode: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            //selectable: "multiple",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            // groupable: true,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "ShipmentMstSlNo", title: "Shipment No" },
+                 { field: "ShipmentDate", title: "Shipment Date" },
+                 { field: "CommInvoiceNo", title: "Invoice No" },
+                 { field: "CommInvoiceDate", title: "Invoice Date" },
+                 { field: "BuyerName", title: "Buyer Name" },
+                 { field: "BuyerCode", hidden: true },
+                 { field: "CountryName", title: "Country" },
+            ]
+
+        }).data('kendoGrid');
+
+        $('#PopupWindowGrid').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+            var selectRow = grid.dataItem(grid.select());
+            PopupWindow.close();
+            SetMasterData(selectRow);
+        });
+
+
+    });
+</script>
+
+<div class="box-header with-border">
+    <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+    <div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+        <div style="text-align:right;">
+            <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>
+            <button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Save</button>
+            <button id="btnView" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-search"></i>Search</button>
+        </div>
+    </div>
+</div>
+<div class="box-body">
+
+    <div class="form-group">
+        <div class="row">
+            <div class="col-lg-3">Shipment No:</div>
+            <div class="col-lg-3"><input type="text" id="ShipmentMstSlNo" name="ShipmentMstSlNo" class="form-control"></div>
+            <div class="col-lg-3">Shipment Date:</div>
+            <div class="col-lg-3"><input type="text" id="ShipmentDate" name="ShipmentDate" readonly="readonly" class="form-control RequiredField date"></div>            
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="row">
+            <div class="col-lg-3">Comercial Invoice No:</div>
+            <div class="col-lg-3">
+                <input type="hidden" id="RegDocMstSlNo" name="CommInvoiceFinalMstSlNo" class="form-control" />
+                <input type="hidden" id="CommInvoiceFinalMstSlNo" name="CommInvoiceFinalMstSlNo" class="form-control" />
+                <input type="text" id="CommInvoiceNo" name="CommInvoiceNo" class="form-control" placeholder="Press F9" readonly="readonly">
+            </div>
+            <div class="col-lg-3">Comercial Invoice Date:</div>
+            <div class="col-lg-3">
+                <input type="text" id="CommInvoiceDate" name="CommInvoiceDate" readonly="readonly" class="form-control RequiredField">
+            </div>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Buyer Name: </div>
+            <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="BuyerName" name="BuyerName" readonly="readonly" class="form-control" /></div>
+            <input type="hidden" id="BuyerCode" name="BuyerCode" class="form-control" />
+
+            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Country: </div>
+            <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                <input type="text" id="CountryName" name="CountryName" readonly="readonly" class="form-control" />
+                <input type="hidden" id="CountryCode" class="form-control" />
+            </div>
+        </div>
+    </div>
+</div>
+<div class="panel panel-success">
+    <div class="panel-body">
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-1 col-lg-2">Document Name: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-2">
+                    <select id="DocName" name="DocName" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+                <div class="col-xs-12 col-sm-6 col-md-1 col-lg-1">Remarks: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="DocRemarks" name="DocRemarks" class="form-control" placeholder="Remarks"></div>
+                <div class="col-xs-12 col-sm-6 col-md-1 col-lg-1">File: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="file" id="DocFile" style="width:17em;" name="DocFile" class="form-control"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="panel-body">
+    <div class="row">
+        <div id="MainGrid" class="MainGrid" tabindex="14"></div>
+    </div>
+</div>
+
+
+<div class="row">
+    <div id="PopupWindow" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGrid" class="PopUpGrid"></div>
+    </div>
+    <div id="PopupWindowShipment" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridShipment" class="PopUpGrid"></div>
+    </div>
+</div>
+
+<div id="RemoveConfirmationMainWindow" class="modal">
+    <div class="modal-body">
+    </div>
+    <div class="modal-footer">
+        <input type="button" class="k-button hide-on-narrow" id="btnRemoveConfirmationMainYes" style="width:70px" value="Yes" />
+        <input type="button" class="k-button hide-on-narrow" id="btnRemoveConfirmationMainNo" style="width:70px" value="No" />
+    </div>
+</div>

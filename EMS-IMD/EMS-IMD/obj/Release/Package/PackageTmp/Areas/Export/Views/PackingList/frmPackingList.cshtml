@@ -1,0 +1,887 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+
+<script type="text/javascript">
+
+    $(document).ready(function () {
+
+        EventPermission();
+        $('#btnReset').click(function () {
+            ResetData();
+            location.reload();
+            dtlList = "";
+            $('#MainGrid').data('kendoGrid').dataSource.filter([]);
+            $('#MainGrid').data('kendoGrid').dataSource.data([]);
+            $('#DetailGrid').data('kendoGrid').dataSource.filter([]);
+            $('#DetailGrid').data('kendoGrid').dataSource.data([]);
+            $('#SubDetailGrid').data('kendoGrid').dataSource.filter([]);
+            $('#SubDetailGrid').data('kendoGrid').dataSource.data([]);
+        });
+
+        /************************************
+       ************* Main Grid *************
+       *************************************
+       *************************************/
+
+        var MainGrid = $('#MainGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: false,
+                schema: {
+                    model: {
+                        id: "ProInvMstSlNo",
+                        fields: {                      
+                            ProformaInvoiceNo: { type: "string", editable: true, validation: { required: true }, defaultValue: "Press (F9)" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: true,
+            edit: function (e) {
+                $("[name='ProformaInvoiceNo']", e.container).on('keyup keypress keydown  dblclick', function (e) {
+                    GetInvoiceList();
+                    PopupWindowInvoice.open();
+                    PopupWindowInvoice.center();
+                });
+                $('input[name = "ProformaInvoiceNo"]').attr("readonly", true);
+                $('input[name = "SAPSoNo"]').attr("readonly", true);
+                $('input[name = "SAPSoDate"]').attr("readonly", true);
+                $('input[name = "PoNo"]').attr("readonly", true);
+                $('input[name = "PoDate"]').attr("readonly", true);
+            },
+            save: function (e) {
+                e.sender.refresh();
+            },
+            selectable: "row",
+            toolbar: [{ text: "Add Items", className: "btnMainGrid", imageClass: "k-icon k-add", }, { template: "<input type='text' id='txtInput' style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 200,
+
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "ProInvMstSlNo", hidden: true },
+                 { field: "ProformaInvoiceNo", title: "Invoice No",  },
+                 { field: "ProformaInvoiceDate", title: "Invoice Date", editable: false},
+                 { field: "SAPSoNo", title: "SAP SO No", editable: false },
+                 { field: "SAPSoDate", title: "SAP SO Date", editable: false },
+                 { field: "PoNo", title: "PO No", editable: false },
+                 { field: "PoDate", title: "PO Date", editable: false },
+            ]
+
+        }).data('kendoGrid');
+
+        function GetInvoiceList() {      
+            $.ajax({
+                url: "/ProformaInvoice/GetProformaInvoiceForPackingGrid",
+                type: 'POST',
+                data: ({ buyerCode: $('#BuyerCode').val(), companyCode: $('#CompanyCode').val() }),
+                dataType: "JSON",
+                success: function (data) {
+                    $("#PopupWindowGridInvoice").data("kendoGrid").dataSource.data(data);
+                }
+            });
+        }
+        var GridForSearch = $("#PopupWindowGridInvoice").kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                schema: {
+                    model: {
+                        id: "ProInvMstSlNo",
+                        fields: {
+                            ProInvMstSlNo: { editable: false },                         
+                        }
+                    }
+                },
+
+            }),
+            selectable: "row",
+            sortable: true,
+            height: 250,
+            // groupable: true,
+            columns: [
+              { field: "ProInvMstSlNo", title: "ProInvMstSlNo" },
+              { field: "ProformaInvoiceNo", title: "ProformaInvoiceNo" },
+              { field: "ProformaInvoiceDate", title: "ProformaInvoiceDate" },
+              { field: "SAPSoNo", title: "SAPSoNo" },
+              { field: "SAPSoDate", title: "SAPSoDate" },       
+              { field: "PoNo", title: "PoNo" },
+              { field: "PoDate", title: "PoDate" },
+            ]
+        });
+
+
+        $('#PopupWindowGridInvoice').dblclick(function () {
+            var isTrue = 1;
+            var grid = $(this).data('kendoGrid');
+            var selectedItem = grid.dataItem(grid.select());
+            var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+            data = dataSource.data(); // Get Detail Grid Data
+            if (dataSource.hasChanges) {
+                for (var i = data.length - 1; i >= 0; i--) {
+                    if (data[i].ProformaInvoiceNo == selectedItem.ProformaInvoiceNo) {
+                        isTrue = 0;
+                        WarningMsg();
+                    }
+                }
+            }
+            if (isTrue == 1) {
+                var gridCiItem = $("#MainGrid").data("kendoGrid");
+                var selectedCiigItem = (gridCiItem.dataItem(gridCiItem.select()));
+                selectedCiigItem.set("ProInvMstSlNo", selectedItem.ProInvMstSlNo);
+                selectedCiigItem.set("ProformaInvoiceNo", selectedItem.ProformaInvoiceNo);
+                selectedCiigItem.set("ProformaInvoiceDate", selectedItem.ProformaInvoiceDate);
+                selectedCiigItem.set("SAPSoNo", selectedItem.SAPSoNo);
+                selectedCiigItem.set("SAPSoDate", selectedItem.SAPSoDate);
+
+                selectedCiigItem.set("PoNo", selectedItem.PoNo);
+                selectedCiigItem.set("PoDate", selectedItem.PoDate);
+
+                SubGrid(selectedItem.ProInvMstSlNo);     
+            }
+
+            PopupWindowInvoice.close();
+        });
+
+        var dtlList = "";
+        function SubGrid(ProInvMstSlNo) {
+
+            if (dtlList == "") {
+                dtlList = dtlList + ProInvMstSlNo;
+            }
+            else {
+                dtlList = dtlList + "," + ProInvMstSlNo;
+            }
+
+            $.ajax({
+                url: "/ProformaInvoice/GetProductListForPackingByProformaID",
+                type: 'POST',
+                data: ({ ProInvMstSlNo: dtlList }),
+                dataType: "JSON",
+                success: function (data) {
+                    $("#DetailGrid").data("kendoGrid").dataSource.data(data);
+                }
+            });
+        }
+
+        $(".btnMainGrid").click(function (e) {
+
+            var Input = InputValidation('CompanyCode') + InputValidation('BuyerName');
+
+            if (Input == 0) {
+                e.preventDefault();
+                DataAddToGrid();
+            }
+            else {
+                ValidationMsg();
+            }
+        });
+
+        var gridInput = 0;
+        function GridValidation() {
+            gridInput = 0;
+            var dataSource = $("#DetailGrid").data("kendoGrid").dataSource;
+            data = dataSource.data(); // Get Detail Grid Data
+            if (dataSource.view().length > 0) {
+                gridInput = 0;
+            }
+            else {
+                gridInput = 1;
+            }
+        }
+
+        function DataAddToGrid() {
+            var addflag = 1; // For Row Add in Detail Grid using enter Key Press
+            var parentFlag = 1; // For Row Add in Detail Grid using enter Key Press without Parent Data
+
+            if (parentFlag == 1) {
+                $("#MessageText").html("");
+                var grid = $("#MainGrid").data("kendoGrid");
+
+                $("#MainGrid").data().kendoGrid.bind('dataBound', function () {
+                    this.element.find('tbody tr:first').addClass('k-state-selected');
+                });
+                var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+                var addData = dataSource.data();
+                if (addData != null) { // For Add row when Exiting Data in Grid
+                    for (var i = 0; i < addData.length; i++) {
+                        if (addData[i].PoMstSlno == "") {
+                            addflag = 0;
+                        }
+                    }
+                }
+                if (addflag == 1) {
+                    grid.addRow();
+                }
+            }
+        }
+
+        /// Creating POP UP For the Buyer Grid To Load
+        var PopupWindowInvoice = $("#PopupWindowInvoice").kendoWindow({
+            width: "70%",
+            height: "50%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+        /************************************
+        ************ Detail Grid ************
+        *************************************
+        *************************************/
+
+        var DetailGrid = $('#DetailGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: false,
+                schema: {
+                    model: {
+                        id: "ProductCode",
+                        fields: {
+                            ProformaInvoiceNo: { type: "string", editable: true, validation: { required: true } },
+                            PackingQtyInPack: { type: "number", editable: true, validation: { required: true } },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            groupable: { messages: { empty: "Product List from Proforma Invoice" } },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: true,
+            selectable: "row",
+            edit: function (e) {
+                $('input[name = "ProformaInvoiceNo"]').attr("readonly", true);
+                $('input[name = "ProductName"]').attr("readonly", true);
+                $('input[name = "NoOfPack"]').attr("readonly", true);
+            },
+            save: function (e) {
+                e.sender.refresh();
+            },
+            navigatable: true,
+            height: 300,
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "ProInvMstSlNo", hidden: true },
+                 { field: "ProformaInvoiceNo", title: "PI No" },
+                 { field: "ProductCode", hidden: true },
+                 { field: "ProductName", title: "Product Name" },
+                 { field: "QtyPerPack", hidden: true },
+                 { field: "NoOfPack", title: "PI Qty in Pack", editable: false },
+                 { field: "PackingQtyInPack", title: "Packing Qty in Pack" },
+            ]
+        }).data('kendoGrid');
+
+
+         /************************************
+         ******* Company Dropdown List *******
+         *************************************
+         *************************************/
+
+        GetCompanyList();
+        function GetCompanyList() {
+            $.ajax({
+                url: '/CompanyInfo/GetCompany',
+                method: 'get',
+                dataType: 'json',
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#CompanyCode').append($('<option>', { value: item.CompanyCode, html: item.CompanyName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+
+
+        /************************************
+        ********** Sub Detail Grid **********
+        *************************************
+        *************************************/
+
+        var SubDetailGrid = $('#SubDetailGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: false,
+                schema: {
+                    model: {
+                        id: "ProductName",
+                        fields: {
+                            ProductCode: { type: "string", editable: true, validation: { required: true } },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            edit: function (e) {
+                $("[name='ProductName']", e.container).on('keyup keypress keydown  dblclick', function (e) {
+
+                   LoadPackingProductForfinalize($('#PackingListSlNo').val());
+                   PopupWindowProducts.open();
+                   PopupWindowProducts.center();
+                });
+            },
+            toolbar: [{ text: "Add Items", className: "btnSubDetailGrid", imageClass: "k-icon k-add", }, ],
+            groupable: { messages: { empty: "Product Summery for Packing List" } },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: true,
+            selectable: "row",
+            navigatable: true,
+            height: 300,         
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                { field: "PackingListProdSlNo", hidden: true },
+                { field: "PackingListSlNo", hidden: true },
+                { field: "ProductCode", hidden: true },
+                { field: "ProductName", title: "Product Name", width: 200 },
+                { field: "PackingQtyInPack", title: "Packing Qty Per Pack", width: 200 },
+                { field: "MCSlNo", title: "MC Sl No", width: 200 },
+                { field: "NoOfMC", title: "No of MC", width: 200 },
+                { field: "NoOfScPerMc", title: "SC Per MC", width: 100 },
+                { field: "PackPerSc", title: "Pack Per SC", width: 200 },              
+                { field: "BatchNo", title: "Batch No", width: 100 },
+                { field: "ManufacturingDate", title: "Manu. Date", width: 200 },
+                { field: "ExpiryDate", title: "Exp. Date", width: 100 },
+                { field: "Length", title: "Length", width: 100 },
+                { field: "Width", title: "Width", width: 100 },
+                { field: "Height", title: "Height", width: 100 },
+                { field: "NetWeight", title: "Net Weight", width: 150 },
+                { field: "NetWeightUnit", title: "Net Weight Unit", width: 180 },
+                { field: "GrossWeight", title: "Gross Weight", width: 150 },
+                { field: "GrossWeightUnit", title: "Gross Weight Unit", width: 180 },
+                { command: [{ name: "DeletedRow", text: "Remove", click: handleDelete }], title: "Remove", width: "70px", headerAttributes: { "class": "gridHeader", style: "font-weight: bold;font-size: 13px;text-align: center" } }
+            ]
+
+        }).data('kendoGrid');
+
+
+        //************************* Handling DELETE event for DELETING ROW from DETAIL GRID ******************************//
+        var dataitem = {};
+        var GridName = null;
+        function handleDelete(event) {
+            event.preventDefault();
+            var GridView = $("#SubDetailGrid").data("kendoGrid");
+            dataitem = (GridView.dataItem(GridView.select()));
+            GridName = SubDetailGrid;
+            RemoveConfirmationMain.open();
+        };
+
+        var RemoveConfirmationMain = $('#RemoveConfirmationMainWindow').kendoWindow({
+            width: "400px",
+            height: "100px",
+            draggable: false,
+            modal: true,
+            title: "Do You Want To Remove This Record?"
+        }).data("kendoWindow").center();
+
+
+        ////Handling Yes button click for master Delete Confirmation[Yes Button]
+        $('#btnRemoveConfirmationMainYes').click(function () {
+            SubDetailGrid.dataSource.remove(dataitem);
+            RemoveConfirmationMain.close();
+            OperationMsg();
+        });
+
+        //Handling No button click for grid row Delete Confirmation[No Button]
+        $('#btnRemoveConfirmationMainNo').click(function () {
+            dataitem = {};
+            RemoveConfirmationMain.close();
+        });
+
+        $(".btnSubDetailGrid").click(function (e) {
+
+            if (gridInput == 0) {
+                e.preventDefault();
+                DataAddtoProductGrid();
+            }
+            else {
+                ValidationMsg();
+            }
+        });
+
+        function DataAddtoProductGrid() {
+            var addflag = 1; // For Row Add in Detail Grid using enter Key Press
+            var parentFlag = 1; // For Row Add in Detail Grid using enter Key Press without Parent Data
+
+            if (parentFlag == 1) {
+                $("#MessageText").html("");
+                var grid = $("#SubDetailGrid").data("kendoGrid");
+
+                $("#SubDetailGrid").data().kendoGrid.bind('dataBound', function () {
+                    this.element.find('tbody tr:first').addClass('k-state-selected');
+                });
+                var dataSource = $("#SubDetailGrid").data("kendoGrid").dataSource;
+                var addData = dataSource.data();
+                if (addData != null) { // For Add row when Exiting Data in Grid
+                    for (var i = 0; i < addData.length; i++) {
+                        if (addData[i].PoMstSlno == "") {
+                            addflag = 0;
+                        }
+                    }
+                }
+                if (addflag == 1) {
+                    grid.addRow();
+                }
+            }
+        }
+
+        var PopupWindowProducts = $("#PopupWindowProducts").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+        var GridProductSearch = $("#PopupWindowGridProducts").kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                schema: {
+                    model: {
+                        id: "ProductCode",
+                        fields: {
+                            ProInvMstSlNo: { editable: false },
+                            Qty: { editable: true },
+                        }
+                    }
+                },
+
+            }),
+            selectable: "row",
+            sortable: true,
+            editable: true,
+            height: 250,
+            // groupable: true,
+            columns: [
+              { field: "ProductCode", title: "Product Code", hidden: true },
+              { field: "ProductName", title: "Product Name" },
+              { field: "PackingQtyInPack", title: "Qty in Pack" },
+               { field: "Qty", title: "Qty", editable: true },
+            ]
+        });
+
+
+      
+        $('#PopupWindowGridProducts').dblclick(function () {
+            var sum = 0;
+            var isTrue = 1;
+            var grid = $(this).data('kendoGrid');
+            var selectedItem = grid.dataItem(grid.select());
+            var dataSource = $("#SubDetailGrid").data("kendoGrid").dataSource;
+            data = dataSource.data(); // Get Detail Grid Data
+            if (dataSource.hasChanges) {
+                for (var i = data.length - 1; i >= 0; i--) {
+                    if (data[i].ProductCode == selectedItem.ProductCode) {
+                        isTrue =1;
+                        sum = parseInt(sum) + parseInt(data[i].PackingQtyInPack);
+                    }
+                }
+            }
+            if (isTrue == 1) {               
+
+                var gridCiItem = $("#SubDetailGrid").data("kendoGrid");
+                var selectedCiigItem = (gridCiItem.dataItem(gridCiItem.select()));
+                if ( parseInt(selectedItem.PackingQtyInPack)>= parseInt(selectedItem.Qty))
+                {
+                    if (parseInt(selectedItem.PackingQtyInPack) - parseInt(sum) >= parseInt(selectedItem.Qty)) {
+                        selectedCiigItem.set("ProductName", selectedItem.ProductName);
+                        selectedCiigItem.set("ProductCode", selectedItem.ProductCode);
+                        selectedCiigItem.set("PackingQtyInPack", selectedItem.Qty);
+                    }
+                    else
+                    {
+                        isTrue = 0;                  
+                        $("#MessageText").show(500).css("margin", "0 1px 20px 0", "color", "grren").html("Not Saved!").delay(800).fadeOut(10000);
+                        $("#MessageText").css("color", "green");
+                    }
+                }
+                else
+                {
+                    isTrue = 0;                  
+                    $("#MessageText").show(500).css("margin", "0 1px 20px 0", "color", "grren").html("Not Saved!").delay(800).fadeOut(10000);
+                    $("#MessageText").css("color", "green");
+                }
+
+                
+            }
+            PopupWindowProducts.close();
+        });
+
+
+
+        /************************************
+        **********POP UP BUYER GRID**********
+        *************************************
+        *************************************/
+
+        /// Creating POP UP For the Buyer Grid To Load
+        var PopupWindowBuyer = $("#PopupWindowBuyer").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+        /// On Key pressing event in Buyer Selection Field
+        $("#BuyerName").on('keyup keypress keydown dblclick', function (e) {
+            PopupWindowBuyer.open();
+            PopupWindowBuyer.center();
+            $.ajax({
+                url: '/BuyerInfo/GetBuyerForProforma',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridBuyer').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindowBuyer.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+
+        /// Creating GRID For Loading Buyer Information
+        var PopupGridBuyer = $('#PopupWindowGridBuyer').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "BuyerCode",
+                        fields: {
+                            BuyerCode: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "BuyerCode", title: "Buyer Code", width: 80 },
+                 { field: "BuyerName", title: "Buyer Name", width: 100 },
+                 { field: "Address", title: "Address", width: 80 },
+                 { field: "CountryName", title: "Country", width: 100 },
+                 { field: "CountryCode", hidden: true },
+            ]
+
+        }).data('kendoGrid');
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridBuyer').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#BuyerCode').val(selectRow.BuyerCode);
+            $('#BuyerName').val(selectRow.BuyerName);
+            $('#BuyerAddress').val(selectRow.Address);
+            PopupWindowBuyer.close();
+        });
+
+        $('#btnProcess').click(function () {
+
+            var Input = InputValidation('CompanyCode') + InputValidation('BuyerName');
+
+            if (Input == 0 && gridInput == 0) {
+
+
+                master.PackingDate = $('#PackingDate').val();
+                master.BuyerCode = $('#BuyerCode').val();
+                master.BuyerName = $('#BuyerName').val();
+                master.CompanyCode = $('#CompanyCode').val();
+                master.Remarks = $('#Remarks').val();
+
+                var PIDtls = $("#MainGrid").data("kendoGrid").dataSource;
+                data = PIDtls.data(); // Get Detail Grid Data
+                master.PackingProformaMSTList = [];
+                if (PIDtls.hasChanges) {
+                    for (var i = data.length - 1; i >= 0; i--) {
+
+                        proformaMaster.ProformaInvoiceNo = data[i].ProformaInvoiceNo;
+                        proformaMaster.ProformaInvoiceDate = data[i].ProformaInvoiceDate;
+                        proformaMaster.SAPSONo = data[i].SAPSONo;
+                        proformaMaster.SAPSODate = data[i].SAPSODate;
+                        proformaMaster.PoNo = data[i].PoNo;
+                        proformaMaster.PoDate = data[i].PoDate;
+
+                        master.PackingProformaMSTList.push(proformaMaster);
+                        proformaMaster = { "PackingListPISlNo": "", "PackingListSlNo": "", "ProformaInvoiceNo": "", "ProformaInvoiceDate": "", "SAPSONo": "", "SAPSODate": "", "PoNo": "", "PoDate": "" };
+                    }
+                }
+
+                var PageDetailsdts = $("#DetailGrid").data("kendoGrid").dataSource;
+                data = PageDetailsdts.data(); // Get Detail Grid Data
+                master.PackingProformaDTLList = [];
+                if (PageDetailsdts.hasChanges) {
+                    for (var i = data.length - 1; i >= 0; i--) {
+
+                        proformaDetails.PackingListPIDtlSlNo = data[i].PackingListPIDtlSlNo;
+                        proformaDetails.PackingListPISlNo = data[i].ProformaInvoiceNo;
+                        proformaDetails.ProductCode = data[i].ProductCode;
+                        proformaDetails.PIQtyInPack = data[i].NoOfPack;
+                        proformaDetails.PackingQtyInPack = data[i].PackingQtyInPack;
+                        proformaDetails.PIQtyInPcs = data[i].NoOfPack * data[i].QtyPerPack;
+                        proformaDetails.PackingQtyInPcs = data[i].PackingQtyInPack * data[i].QtyPerPack;
+
+                        master.PackingProformaDTLList.push(proformaDetails);
+                        proformaDetails = { "PackingListPIDtlSlNo": "", "PackingListPISlNo": "", "ProductCode": "", "PIQtyInPack": "", "PIQtyInPcs": "", "PackingQtyInPcs": "", "PackingQtyInPack": "" };
+                    }
+                }
+
+                $.ajax({
+                    url: '/PackingList/OperationsMode',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.Status == "Yes") {
+                            $("#PackingListSlNo").val(data.ID);
+                            OperationMsg(data.Mode);
+                        }
+                        else {
+                            ErrorFrmServerMsg(data.Status);
+                        }
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+            else {
+                ValidationMsg();
+            }
+        });
+
+        var master = { "PackingDate": "", "BuyerCode": "", "BuyerName": "", "CompanyCode": "", "Remarks": "", "PackingProformaMSTList": [], "PackingProformaDTLList": [], "PackingProdDetailsList": [] };
+        var proformaDetails = { "PackingListPIDtlSlNo": "", "PackingListPISlNo": "", "ProductCode": "", "PIQtyInPack": "", "PIQtyInPcs": "", "PackingQtyInPcs": "", "PackingQtyInPack": "" };
+        var proformaMaster = { "PackingListPISlNo": "", "PackingListSlNo": "", "ProformaInvoiceNo": "", "ProformaInvoiceDate": "", "SAPSONo": "", "SAPSODate": "", "PoNo": "", "PoDate": "" };
+        var packingDetails = { "PackingListProdSlNo": "", "PackingListSlNo": "", "ProductCode": "", "MCSlNo": "", "NoOfMC": "", "NoOfScPerMc": "", "PackPerSc": "", "PackingQtyInPack": "", "BatchNo": "", "ManufacturingDate": "", "ExpiryDate": "", "Length": "", "Width": "", "Height": "", "NetWeight": "", "NetWeightUnit": "", "GrossWeight": "", "GrossWeightUnit": ""};
+
+
+        $('#btnSave').click(function () {
+
+            var Input = InputValidation('CompanyCode') + InputValidation('BuyerName');
+
+            if (Input == 0 && gridInput == 0) {
+
+                var PageDetailsdts = $("#SubDetailGrid").data("kendoGrid").dataSource;
+                data = PageDetailsdts.data(); // Get Detail Grid Data
+                master.PackingProdDetailsList = [];
+                if (PageDetailsdts.hasChanges) {
+                    for (var i = data.length - 1; i >= 0; i--) {
+
+                        packingDetails.PackingListProdSlNo = data[i].PackingListProdSlNo;
+                        packingDetails.PackingListSlNo = $("#PackingListSlNo").val();
+                        packingDetails.ProductCode = data[i].ProductCode;
+                        packingDetails.MCSlNo = data[i].MCSlNo;
+                        packingDetails.NoOfMC = data[i].NoOfMC;
+                        packingDetails.NoOfScPerMc = data[i].NoOfScPerMc;
+                        packingDetails.PackPerSc = data[i].PackPerSc;
+                        packingDetails.PackingQtyInPack = data[i].PackingQtyInPack;
+                        packingDetails.BatchNo = data[i].BatchNo;
+                        packingDetails.ManufacturingDate = data[i].ManufacturingDate;
+                        packingDetails.ExpiryDate = data[i].ExpiryDate;
+                        packingDetails.Length = data[i].Length;
+                        packingDetails.Height = data[i].Height;
+                        packingDetails.Width = data[i].Width;
+                        packingDetails.NetWeight = data[i].NetWeight;
+                        packingDetails.NetWeightUnit = data[i].NetWeightUnit;
+                        packingDetails.GrossWeight = data[i].GrossWeight;
+                        packingDetails.GrossWeightUnit = data[i].GrossWeightUnit;
+
+                        master.PackingProdDetailsList.push(packingDetails);
+                        packingDetails = { "PackingListProdSlNo": "", "PackingListSlNo": "", "ProductCode": "", "MCSlNo": "", "NoOfMC": "", "NoOfScPerMc": "", "PackPerSc": "", "PackingQtyInPack": "", "BatchNo": "", "ManufacturingDate": "", "ExpiryDate": "", "Length": "", "Width": "", "Height": "", "NetWeight": "", "NetWeightUnit": "", "GrossWeight": "", "GrossWeightUnit": "" };
+                    }
+                }
+
+                $.ajax({
+                    url: '/PackingList/FinalizeData',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.Status == "Yes") {
+                            OperationMsg(data.Mode);
+                        }
+                        else {
+                            ErrorFrmServerMsg(data.Status);
+                        }
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+            else {
+                ValidationMsg();
+            }
+        });
+
+
+        function LoadPackingProductForfinalize(PackingMasterID)
+        {
+           
+            $.ajax({
+                url: "/PackingList/GetProductsForPackingFinalization",
+                type: 'POST',
+                data: ({ packingMasterID: PackingMasterID}),
+                dataType: "JSON",
+                success: function (data) {
+                    $("#PopupWindowGridProducts").data("kendoGrid").dataSource.data(data);
+                }
+            });
+        }
+
+    });
+
+</script>
+
+
+<div class="box-header with-border">
+    @*Form Title*@
+    <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+    <div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+        <div style="text-align:right;">
+            <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>  
+            <button id="btnView" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-search"></i>View</button>
+            @* <button id="btnDelete" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-trash"></i>Delete</button>*@
+        </div>
+    </div>
+</div>
+
+<div class="box-body">
+    <div class="form-horizontal">
+        @*Form Body Content*@
+        <div class="form-group has-feedback">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Packing Date:</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="PackingDate" name="PackingDate" class="date form-control" /><i class="fa fa-calendar form-control-feedback"></i></div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="PackingListSlNo" name="PackingListSlNo" placeholder="Packing List No" readonly="readonly" class="RequiredField form-control" /></div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Company Name:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="CompanyCode" name="CompanyCode" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Buyer Name: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="BuyerName" name="BuyerName" placeholder="Press Any Key" class="RequiredField form-control" /></div>
+                <input type="hidden" id="BuyerCode" name="BuyerCode" class="form-control" />
+                <input type="hidden" id="CountryCode" name="CountryCode" class="form-control" />
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Buyer Address: </div>
+                <div class="col-lg-9"><textarea id="BuyerAddress" name="BuyerAddress" maxlength="150" readonly="readonly" class="RequiredField form-control"></textarea></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Remarks: </div>
+                <div class="col-lg-9"><textarea id="Remarks" name="Remarks" placeholder="Remarks" maxlength="150" class="form-control"></textarea></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+        <div id="MainGrid" class="MainGrid"></div>
+    </div>
+</div>
+<br />
+<div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+        <div id="DetailGrid" class="DetailGrid"></div>
+    </div>
+</div>
+<br />
+<button id="btnProcess" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Process Data For Packing</button>
+<br />
+<br />
+<div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+        <div id="SubDetailGrid" class="SubDetailGrid"></div>
+    </div>
+</div>
+
+<br />
+<button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Complete Packing Finalization</button>
+
+
+<div class="row">
+    <div id="PopupWindow" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGrid" class="PopUpGrid"></div>
+    </div>
+    <div id="PopupWindowBuyer" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridBuyer" class="PopUpGrid"></div>
+    </div>
+    <div id="PopupWindowInvoice" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridInvoice" class="PopUpGrid"></div>
+    </div>
+    <div id="PopupWindowProducts" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridProducts" class="PopUpGrid"></div>
+    </div>
+</div>
+
+
+<div id="RemoveConfirmationMainWindow" class="modal">
+    <div class="modal-body">
+    </div>
+    <div class="modal-footer">
+        <input type="button" class="k-button hide-on-narrow" id="btnRemoveConfirmationMainYes" style="width:70px" value="Yes" />
+        <input type="button" class="k-button hide-on-narrow" id="btnRemoveConfirmationMainNo" style="width:70px" value="No" />
+    </div>
+</div>
+

@@ -1,0 +1,674 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+
+<script type="text/javascript">
+    $(document).ready(function () {
+
+        EventPermission();
+        $('#btnReset').click(function () {
+            ResetData();
+            location.reload();
+            document.getElementById('ProductCode').readOnly = false;
+        });
+
+
+        /************************************
+        **********POP UP Generic GRID**********
+        *************************************
+        *************************************/
+
+
+        /// Creating POP UP For the Generic Grid To Load
+        var PopupWindowGeneric = $("#PopupWindowGeneric").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+        /// On Key pressing event in Generic Selection Field
+        $("#GenericName").on('keyup keypress keydown dblclick', function (e) {
+            PopupWindowGeneric.open();
+            $.ajax({
+                url: '/GenericInfo/GetGenericInfo',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridGeneric').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+
+        /// Creating GRID For Loading Generic Information
+        var PopupGridGeneric = $('#PopupWindowGridGeneric').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "GenericCode",
+                        fields: {
+                            GenericCode: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInputGeneric'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "GenericCode", title: "Generic Code", width: 80, hidden : true },
+                 { field: "GenericName", title: "Generic Name", width: 100 },
+            ]
+
+        }).data('kendoGrid');
+
+        //Produc Name twise Filter table row
+        $("#txtPopupInputGeneric").keyup(function () {
+            var val = $(this).val();
+            $("#PopupWindowGridGeneric").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "GenericCode", operator: "contains", value: val },
+                     { field: "GenericName", operator: "contains", value: val },
+                ]
+            });
+        });
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridGeneric').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#GenericCode').val(selectRow.GenericCode);
+            $('#GenericName').val(selectRow.GenericName);
+            PopupWindowGeneric.close();
+        });
+
+        /************************************
+        **********POP UP BUYER GRID**********
+        *************************************
+        *************************************/
+
+        /// Creating POP UP For the Buyer Grid To Load
+        var PopupWindowBuyer = $("#PopupWindowBuyer").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+        /// On Key pressing event in Buyer Selection Field
+        $("#BuyerName").on('keyup keypress keydown dblclick', function (e) {
+            PopupWindowBuyer.open();
+            $.ajax({
+                url: '/BuyerInfo/GetBuyer',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridBuyer').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+
+        /// Creating GRID For Loading Buyer Information
+        var PopupGridBuyer = $('#PopupWindowGridBuyer').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "BuyerCode",
+                        fields: {
+                            BuyerCode: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInputBuyer'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "BuyerCode", title: "Buyer Code", width: 80, hidden: true },
+                 { field: "BuyerName", title: "Buyer Name", width: 100 },
+                 { field: "Address", title: "Address", width: 80 },
+                 { field: "CountryName", title: "Country", width: 100 },
+                 { field: "CountryCode", hidden: true, },
+            ]
+
+        }).data('kendoGrid');
+
+
+        //Produc Name twise Filter table row
+        $("#txtPopupInputBuyer").keyup(function () {
+            var val = $(this).val();
+            $("#PopupWindowGridBuyer").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "BuyerCode", operator: "contains", value: val },
+                     { field: "BuyerName", operator: "contains", value: val },
+                     { field: "CountryName", operator: "contains", value: val },
+                ]
+            });
+        });
+
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridBuyer').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#BuyerCode').val(selectRow.BuyerCode);
+            $('#BuyerName').val(selectRow.BuyerName);
+            $('#CountryName').val(selectRow.CountryName);
+            $('#CountryCode').val(selectRow.CountryCode);
+            PopupWindowBuyer.close();
+        });
+
+
+        /************************************
+        ****POP UP Therapeutic Class GRID****
+        *************************************
+        *************************************/
+
+
+        /// Creating POP UP For the TherapeuticClass Grid To Load
+        var PopupWindowTherapeuticClass = $("#PopupWindowTherapeuticClass").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+
+        /// On Key pressing event in TherapeuticClass Selection Field
+        $("#TherapeuticClassName").on('keyup keypress keydown dblclick', function (e) {
+            PopupWindowTherapeuticClass.open();
+            $.ajax({
+                url: '/TherapeuticClassInfo/GetTherapeuticInfo',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridTherapeuticClass').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+
+        /// Creating GRID For Loading TherapeuticClass Information
+        var PopupGridTherapeuticClass = $('#PopupWindowGridTherapeuticClass').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "TherapeuticClassCode",
+                        fields: {
+                            TherapeuticClassCode: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInputTherapeutic'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "TherapeuticClassCode", title: "Therapeutic Class Code", width: 80, hidden: true },
+                 { field: "TherapeuticClassName", title: "Therapeutic Class Name", width: 100 },
+            ]
+
+        }).data('kendoGrid');
+
+        //Produc Name twise Filter table row
+        $("#txtPopupInputTherapeutic").keyup(function () {
+            var val = $(this).val();
+            $("#PopupWindowGridTherapeuticClass").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "TherapeuticClassCode", operator: "contains", value: val },
+                     { field: "TherapeuticClassName", operator: "contains", value: val },
+                ]
+            });
+        });
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridTherapeuticClass').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#TherapeuticClassCode').val(selectRow.TherapeuticClassCode);
+            $('#TherapeuticClassName').val(selectRow.TherapeuticClassName);
+            PopupWindowTherapeuticClass.close();
+        });
+
+
+
+        /************************************
+        *********POP UP COMPANY GRID*********
+        *************************************
+        *************************************/
+
+
+        /// Creating POP UP For the Company Grid To Load
+        var PopupWindowCompany = $("#PopupWindowCompany").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+
+        /// On Key pressing event in Company Selection Field
+        $("#CompanyName").on('keyup keypress keydown dblclick', function (e) {
+            PopupWindowCompany.open();
+            $.ajax({
+                url: '/CompanyInfo/GetCompany',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridCompany').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+
+        /// Creating GRID For Loading Company Information
+        var PopupGridCompany = $('#PopupWindowGridCompany').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "CompanyCode",
+                        fields: {
+                            CompanyCode: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "CompanyCode", title: "Company Code", width: 80, hidden: true },
+                 { field: "CompanyName", title: "Company Name", width: 100 },
+                 { field: "Address", title: "Address", width: 80 },
+            ]
+
+        }).data('kendoGrid');
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridCompany').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#CompanyCode').val(selectRow.CompanyCode);
+            $('#CompanyName').val(selectRow.CompanyName);
+            PopupWindowCompany.close();
+        });
+
+
+        /************************************
+        *********POP UP LOADING GRID*********
+        *************************************
+        *************************************/
+
+        $('#btnView').click(function () {
+            PopupWindow.open();
+            $.ajax({
+                url: '/ProductInfo/GetProduct',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGrid').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+                //complete: function () { },
+            });
+        });
+
+        //Initializing Main page details Kendo Grid Colums
+        var PopupGrid = $('#PopupWindowGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "ProductCode",
+                        fields: {
+                            ProductCode: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            //selectable: "multiple",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            // groupable: true,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "ProductCode", title: "Product Code", width: 80 },
+                 { field: "ProductName", title: "Product Name", width: 100 },
+                 { field: "CompanyName", title: "Company Name", width: 80 },
+                 { field: "CountryName", title: "Country Name", width: 80 },
+                 { field: "Strength", title: "Strength", width: 80 },
+                 { field: "TherapeuticClassName", title: "Therapeutic Class Name", width: 80 },
+            ]
+
+        }).data('kendoGrid');
+
+        $('#PopupWindowGrid').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+            var selectRow = grid.dataItem(grid.select());
+            document.getElementById('ProductCode').readOnly = true;
+            PopupWindow.close();
+            SetMasterData(selectRow);
+        });
+
+        //Produc Name twise Filter table row
+        $("#txtPopupInput").keyup(function () {
+            var val = $(this).val();
+            $("#PopupWindowGrid").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "ProductCode", operator: "contains", value: val },
+                     { field: "ProductName", operator: "contains", value: val },
+                     { field: "CompanyName", operator: "contains", value: val },
+                     { field: "CountryName", operator: "contains", value: val },
+                     { field: "Strength", operator: "contains", value: val },
+                     { field: "TherapeuticClassName", operator: "contains", value: val },
+                ]
+            });
+        });
+
+
+
+        $('#btnSave').click(function () {
+            var Input = InputValidation('ProductCode') + InputValidation('PackSize') + InputValidation('QtyPerPack') + InputValidation('ProductName') + InputValidation('CompanyName') + InputValidation('BuyerName') + InputValidation('PackSize') + InputValidation('Strength') + InputValidation('GenericName') + InputValidation('TherapeuticClassName') + InputValidation('RegistrationNo') + InputValidation('Brand'); +InputValidation('Strength')
+
+            if (Input == 0) {
+                master.ProductCode = $('#ProductCode').val();
+                master.ProductName = $('#ProductName').val();
+                master.PackSize = $('#PackSize').val();;
+                master.Strength = $('#Strength').val();
+                master.GenericCode = $('#GenericCode').val();
+                master.GenericName = $('#GenericName').val();
+                master.TherapeuticClassCode = $('#TherapeuticClassCode').val();
+                master.TherapeuticClassName = $('#TherapeuticClassName').val();
+                master.Brand = $('#Brand').val();
+                master.QtyPerPack = $('#QtyPerPack').val();
+                master.MfgUnitCode = $('#MfgUnitCode').val();;
+                master.RegistrationNo = $('#RegistrationNo').val();
+                master.CompanyCode = $('#CompanyCode').val();
+                master.CompanyName = $('#CompanyName').val();
+                master.BuyerCode = $('#BuyerCode').val();
+                master.BuyerName = $('#BuyerName').val();
+                master.CountryCode = $('#CountryCode').val();
+                master.CountryName = $('#CountryName').val()
+                master.Status = $('#Status').val();
+
+                $.ajax({
+                    url: '/ProductInfo/OperationsMode',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.Status == "Yes") {
+                            OperationMsg(data.Mode);
+                        }
+                        else {
+                            ErrorFrmServerMsg(data.Status);
+                        }
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+            else {
+                ValidationMsg();
+            }
+
+        });
+        var master = { "ProductCode": "", "ProductName": "", "PackSize": "", "Strength": "", "GenericCode": "", "GenericName": "", "TherapeuticClassCode": "", "TherapeuticClassName": "", "Brand": "", "QtyPerPack": "", "MfgUnitCode": "", "RegistrationNo": "", "CompanyCode": "", "CompanyName": "", "BuyerCode": "", "BuyerName": "", "CountryCode": "", "CountryName": "", "Status": "" };
+    });
+</script>
+
+<div class="box-header with-border">
+    @*Form Title*@
+    <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+    <div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+        <div style="text-align:right;">
+            <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>
+            <button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Save</button>
+            <button id="btnView" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-search"></i>View</button>
+            @* <button id="btnDelete" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-trash"></i>Delete</button>*@
+        </div>
+    </div>
+</div>
+
+<div class="box-body">
+    <div class="form-horizontal">
+        @*Form Body Content*@
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Product Code:</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="ProductCode" name="ProductCode" placeholder="Product Code" maxlength="6" class="RequiredField form-control" /></div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Product Name:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3"><input type="text" id="ProductName" maxlength="150" name="ProductName" placeholder="Product Name" class="RequiredField form-control" /></div>
+                
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Buyer Name: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="BuyerName" name="BuyerName" placeholder="Press Any Key" class="form-control" /></div>
+                <input type="hidden" id="BuyerCode" name="BuyerCode" class="form-control" />
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Factory Name:</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="CompanyName" name="CompanyName" placeholder="Press Any Key" class="form-control" /></div>
+                <input type="hidden" id="CompanyCode" name="CompanyCode" class="form-control" />
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Generic Name: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="GenericName" name="GenericName" placeholder="Press Any Key" class="form-control" /></div>
+                <input type="hidden" id="GenericCode" name="GenericCode" class="form-control" />
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Therapeutic Class: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="TherapeuticClassName" name="TherapeuticClassName" placeholder="Press Any Key" class="form-control" /></div>
+                <input type="hidden" id="TherapeuticClassCode" name="TherapeuticClassCode" class="form-control" />
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Pack Size: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="PackSize" maxlength="30" name="PackSize" placeholder="Pack Size" class="RequiredField form-control" /></div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Qty Per Pack: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="QtyPerPack" maxlength="3" name="QtyPerPack" placeholder="Quantity Per Pack" class="RequiredField form-control" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Country: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="CountryName" name="CountryName" readonly="readonly" class="form-control" />
+                    <input type="hidden" id="CountryCode" class="form-control" />
+                </div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Strength: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="Strength" maxlength="50" name="Strength" placeholder="Strength" class="RequiredField form-control" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Registration No: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="RegistrationNo" maxlength="50" name="RegistrationNo" placeholder="Registration No" class="RequiredField form-control" /></div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Brand: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="Brand" maxlength="50" name="Brand" placeholder="Brand" class="RequiredField form-control" /></div>
+            </div>
+        </div>
+
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3"> Active Status:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    @*<input type="text" id="BuyerName" name="BuyerName" placeholder="Buyer Name" class="RequiredField form-control" />*@
+                    <select id="Status" name="Status" class="form-control">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="box-footer">@*Form Footer*@</div>
+<div class="row">
+    <div id="PopupWindow" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGrid" class="PopUpGrid"></div>
+    </div>
+
+    <div id="PopupWindowBuyer" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridBuyer" class="PopUpGrid"></div>
+    </div>
+
+    <div id="PopupWindowCompany" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridCompany" class="PopUpGrid"></div>
+    </div>
+
+    <div id="PopupWindowTherapeuticClass" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridTherapeuticClass" class="PopUpGrid"></div>
+    </div>
+
+    <div id="PopupWindowGeneric" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridGeneric" class="PopUpGrid"></div>
+    </div>
+
+</div>

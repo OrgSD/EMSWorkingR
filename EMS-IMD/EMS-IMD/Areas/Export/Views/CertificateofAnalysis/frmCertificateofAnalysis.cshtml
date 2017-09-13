@@ -1,0 +1,395 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+
+<script type="text/javascript">
+    $(document).ready(function () {
+  
+
+      // $("#frameID").attr("src", "/UploadFiles/COA/COA_11092017_328.pdf");
+       
+ 
+
+    
+
+
+        $('#btnView').click(function () {
+
+            PopupWindow.open();
+            $.ajax({
+                url: '/CertificateofAnalysis/GetCOAList',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGrid').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+                //complete: function () { },
+            });
+        });
+
+        //Initializing Main page details Kendo Grid Colums
+        var PopupGrid = $('#PopupWindowGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "BuyerCode",
+                        fields: {
+                            BuyerCode: { type: "string" }
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            //selectable: "multiple",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            // groupable: true,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "COASlNo", hidden: true, width: 80 },
+                 { field: "PackingListSlNo", title: "Packing List No", width: 100 },
+                 { field: "BatchNo", title: "Batch No", width: 80 },
+                 { field: "DocRef", hidden:true, width: 100 },
+                 { field: "Remarks", title: "Remarks", width: 80 },
+
+            ]
+
+        }).data('kendoGrid');
+
+       
+
+      /************************************
+      *********POP UP PACKING GRID*********
+      *************************************
+      *************************************/
+
+        /// Creating POP UP For the Pack Grid To Load
+        var PopupWindowPack = $("#PopupWindowPack").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+        /// On Key pressing event in Pack Selection Field
+        $("#PackingListSlNo").on('keyup keypress keydown dblclick', function (e) {
+            PopupWindowPack.open();
+            PopupWindowPack.center();
+            $.ajax({
+                url: '/PackingList/GetPackingListForCOA',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridPack').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindowPack.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+
+        /// Creating GRID For Loading Pack Information
+        var PopupGridPack = $('#PopupWindowGridPack').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "PackingListSlNo",
+                        fields: {
+                            PackingListSlNo: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "PackingListSlNo", title: "Pack Sl No", width: 80 },
+                 { field: "PackingDate", title: "Packing Date", width: 100 },
+                 { field: "CompanyName", title: "Company", width: 80 },
+            ]
+
+        }).data('kendoGrid');
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridPack').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#PackingListSlNo').val(selectRow.PackingListSlNo);
+            GetBatchList(selectRow.PackingListSlNo);
+            PopupWindowPack.close();
+        });
+
+
+
+        /************************************
+        **** Pending Batch Dropdown List ****
+        *************************************
+        *************************************/
+
+
+        function GetBatchList(PackingListSlNo) {
+            $.ajax({
+                url: '/CertificateofAnalysis/GetPendingBatchNo',
+                type: 'POST',
+                contentType: 'application/json;',
+                dataType: 'json',
+                data: JSON.stringify({ PackingListSlNo: PackingListSlNo }),
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#BatchNo').append($('<option>', { value: item.BatchNo, html: item.BatchNo }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+
+         /************************************
+         ****** Uploading COA Document *******
+         *************************************
+         *************************************/
+
+        //$('input[type="file"]').change(function () {    
+        //    var f = this.files[0];
+        //    var name = f.name;
+        //    alert(name);         
+
+        //});
+
+        $('#PopupWindowGrid').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+            var selectRow = grid.dataItem(grid.select());
+            PopupWindow.close();
+            SetMasterData(selectRow);
+         
+            //$('#DocFile').prop(selectRow.DocRef);
+       
+            $("#frameID").attr("src", selectRow.DocRef);
+          
+        });
+        $('#frameID').load(function () {       
+            var src = $(this).attr('src');
+            var filename = src.replace(/^.*[\\\/]/, '');
+            $('#DocFile').val(filename);
+           
+
+            //var filename = document.getElementById('DocFile').value;
+            //document.getElementById('DocFile').value = filename;
+
+
+         //   $('#DocFile').prop(filename);
+         
+        });
+        $('#DocFile').on('change', function (e) {
+
+            var files = e.target.files;
+            var name = files[0].name;
+           // alert(name);
+              if (files.length > 0) {
+                    if (window.FormData !== undefined) {
+                        var data = new FormData();
+                        for (var x = 0; x < files.length; x++) {
+                            data.append("file" + x, files[x]);
+                        }
+                        $.ajax({
+                            type: "POST",
+                            url: '/CertificateofAnalysis/UploadCOA',
+                            contentType: false,
+                            processData: false,
+                            data: data,
+                            success: function (result) {
+                   
+                                $("#frameID").attr("src", result);
+                            },
+                            error: function (xhr, status, p3, p4) {
+                                var err = "Error " + " " + status + " " + p3 + " " + p4;
+                                if (xhr.responseText && xhr.responseText[0] == "{")
+                                    err = JSON.parse(xhr.responseText).Message;
+                            }
+                        });
+                    }
+                    else {
+                        alert("This browser doesn't support HTML5 file uploads!");
+                    }
+                }
+        });
+
+
+
+        $('#btnSave').click(function () {
+            var Input = InputValidation('PackingListSlNo') + InputValidation('BatchNo');
+
+            if (Input == 0) {
+                master.COASlNo = $('#COASlNo').val();
+                master.PackingListSlNo = $('#PackingListSlNo').val();
+                master.BatchNo = $('#BatchNo').val();;
+                master.DocRef = $('#DocRef').val();
+                master.Remarks = $('#Remarks').val();
+
+                $.ajax({
+                    url: '/CertificateofAnalysis/OperationsMode',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.Status == "Yes") {
+                            $("#COASlNo").val(data.ID);
+                            OperationMsg(data.Mode);
+                        }
+                        else {
+                            ErrorFrmServerMsg(data.Status);
+                        }
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+            else {
+                ValidationMsg();
+            }
+
+        });
+
+        var master = { "COASlNo": "", "PackingListSlNo": "", "BatchNo": "", "DocRef": "", "Remarks": "" };
+      
+      
+    });
+</script>
+
+    <div class="box-header with-border">
+        @*Form Title*@
+
+        <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+        <div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+            <div style="text-align:right;">
+
+                <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>
+                <button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Save</button>
+                <button id="btnView" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-search"></i>View</button>
+                @* <button id="btnDelete" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-trash"></i>Delete</button>*@
+            </div>
+        </div>
+    </div>
+
+    <div class="box-body">
+        <div class="form-horizontal">
+            @*Form Body Content*@
+            <div class="form-group has-feedback">
+                <div class="row">
+                    <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">COA Sl No:</div>
+                    <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="COASlNo" name="COASlNo" placeholder="SL No" readonly="readonly" class="RequiredField form-control" /></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="row">
+                    <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Packing SL No: </div>
+                    <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="PackingListSlNo" name="PackingListSlNo" placeholder="Press F9" class="RequiredField form-control" /></div>
+
+                    <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Batch No:</div>
+                    <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                        <select id="BatchNo" name="BatchNo" class="RequiredField form-control">
+                            <option value=""></option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="row">
+                    <div class="col-lg-3">Remarks: </div>
+                    <div class="col-lg-9"><textarea id="Remarks" name="Remarks" maxlength="150" class="RequiredField form-control"></textarea></div>
+                </div>
+            </div>
+            <div class="form-group  has-feedback">
+                <div class="row">
+                    <div class="col-xs-12 col-sm-6 col-md-4 col-lg-3">Upload File: </div>
+                    <div class="col-xs-0 col-sm-6 col-md-4 col-lg-3">
+                        <input type="file" id="DocFile" style="width:17.6em;" name="DocFile" accept="application/pdf" class="form-control">
+                        <input type="hidden" id="DocRef" class="form-control" />
+
+                    </div>
+                  
+                    
+
+                    </div>
+            </div>
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-4 col-lg-3">     </div>
+                <div class="col-xs-0 col-sm-6 col-md-4 col-lg-3">
+                    <div class="panel-body">
+                        <iframe id="frameID" src="" width="400" height="250"> </iframe></div>
+
+
+                </div>
+
+
+             
+
+                </div>
+
+
+
+            </div>
+    </div>
+
+    <div class="box-footer">@*Form Footer*@</div>
+    <div class="row">
+        <div id="PopupWindow" class="PopupWindowLayout" style="display: none;">
+            <div id="PopupWindowGrid" class="PopUpGrid"></div>
+        </div>
+
+        <div id="PopupWindowPack" class="PopupWindowLayout" style="display: none;">
+            <div id="PopupWindowGridPack" class="PopUpGrid"></div>
+        </div>
+    </div>
+

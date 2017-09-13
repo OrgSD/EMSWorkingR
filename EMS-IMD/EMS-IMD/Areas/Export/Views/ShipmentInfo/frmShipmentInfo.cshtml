@@ -1,0 +1,848 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+<script type="text/javascript">
+
+    $(document).ready(function () {
+
+        EventPermission();
+        $('#btnReset').click(function () {
+            ResetData();
+            $('#MainGrid').data('kendoGrid').dataSource.filter([]);
+            $('#MainGrid').data('kendoGrid').dataSource.data([]);
+            $('#DetailGrid').data('kendoGrid').dataSource.filter([]);
+            $('#DetailGrid').data('kendoGrid').dataSource.data([]);
+        });
+
+        $('#btnView').click(function () {
+
+            PopupWindow.open();
+
+            $.ajax({
+                url: '/CurrencyInfo/GetCurrency',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGrid').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+                //complete: function () { },
+            });
+
+        });
+
+
+        //************************* Handling DELETE event for DELETING ROW from DETAIL GRID ******************************//
+        var dataitem = {};
+        var GridName = null;
+        function handleDelete(event) {
+            var GridView = $("#MainGrid").data("kendoGrid");
+            dataitem = (GridView.dataItem(GridView.select()));
+            GridName = MainGrid;
+            RemoveConfirmationMain.open();
+        };
+
+        var RemoveConfirmationMain = $('#RemoveConfirmationMainWindow').kendoWindow({
+            width: "400px",
+            height: "100px",
+            draggable: false,
+            modal: true,
+            title: "Do You Want To Remove This Record?"
+        }).data("kendoWindow").center();
+
+
+        ////Handling Yes button click for master Delete Confirmation[Yes Button]
+        $('#btnRemoveConfirmationMainYes').click(function () {
+            MainGrid.dataSource.remove(dataitem);
+            RemoveConfirmationMain.close();
+            OperationMsg();
+        });
+
+        //Handling No button click for grid row Delete Confirmation[No Button]
+        $('#btnRemoveConfirmationMainNo').click(function () {
+            dataitem = {};
+            RemoveConfirmationMain.close();
+        });
+
+        /************************************
+        **** Document Type Dropdown List ****
+        *************************************
+        *************************************/
+
+        getDocumentNames();
+        function getDocumentNames() {
+            $.ajax({
+                url: '/General/GetDocumentType',
+                method: 'get',
+                dataType: 'json',
+                data: { formType: "Shipment" },
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#DocName').append($('<option>', { value: item.DocName, html: item.DocName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+
+
+        /************************************
+         **********POP UP ComIn GRID**********
+         *************************************
+         *************************************/
+
+        /// Creating POP UP For the ComIn Grid To Load
+        var PopupWindowComIn = $("#PopupWindowComIn").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+        /// On Key pressing event in ComIn Selection Field
+        $("#CommInvoiceNo").on('keyup keypress keydown dblclick', function (e) {
+            PopupWindowComIn.open();
+            $.ajax({
+                url: '/ShipmentInfo/GetCommercialInvoListForShipment',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridComIn').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindowComIn.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+        /************************************
+         ***POP UP COMMERCIAL INVOICE GRID***
+         *************************************
+         *************************************/
+
+        /// Creating GRID For Loading ComIn Information
+        var PopupGridComIn = $('#PopupWindowGridComIn').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "CommInvoiceNo",
+                        fields: {
+                            CommInvoiceNo: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "CommInvoiceFinalMstSlNo", hidden: true },
+                 { field: "CommInvoiceNo", title: "Commercial Invoice No", width: 80 },
+                 { field: "CommInvoiceDate", title: "Commercial Invoice Date", width: 100 },
+                 { field: "BuyerCode", hidden: true, width: 100 },
+                 { field: "BuyerName", title: "Buyer Name", width: 100 },
+                 { field: "CountryCode", hidden: true },
+                 { field: "CountryName", title: "Country", width: 100 },
+            ]
+
+        }).data('kendoGrid');
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridComIn').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#CommInvoiceFinalMstSlNo').val(selectRow.CommInvoiceFinalMstSlNo);
+            $('#CommInvoiceNo').val(selectRow.CommInvoiceNo);
+            $('#CommInvoiceDate').val(selectRow.CommInvoiceDate);
+            $('#BuyerCode').val(selectRow.BuyerCode);
+            $('#BuyerName').val(selectRow.BuyerName);
+            $('#CountryCode').val(selectRow.CountryCode);
+            $('#CountryName').val(selectRow.CountryName);
+
+            PopupWindowComIn.close();
+        });
+
+        /************************************
+        **************MAIN GRID**************
+        *************************************
+        *************************************/
+
+        //Initializing Main page details Kendo Grid Colums
+        var MainGrid = $('#MainGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "ProformaInvoiceNo",
+                        fields: {
+                            ProformaInvoiceNo: { type: "string", editable: true, validation: { required: true }, defaultValue: "Press (F9)" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: true,
+            selectable: "row",
+            edit: function (e) {
+                $("[name='ProformaInvoiceNo']", e.container).on('keyup keypress keydown  dblclick', function (e) {
+                    GetInvoiceList();
+                    PopupWindowInvoice.open();
+                    PopupWindowInvoice.center();
+                });
+            },
+            toolbar: [{ text: "Add Items", className: "btnMain", style: "float:left", imageClass: "k-icon k-add", attributes: { "class": "k-grid-toolbar k-button" } }],
+            navigatable: false,
+            height: 230,
+            groupable: { messages: { empty: "" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "ShipmentDtlSlNo", hidden: true },
+                 { field: "ShipmentMstSlNo", hidden: true },
+                 { field: "ProformaInvoiceNo", title: "Proforma Invoice No.", width: 80 },
+                 { field: "ProformaInvoiceDate", title: "Proforma Invoice Date", width: 80 },
+                 { field: "PackingListSlNo", title: "Packing List No.", width: 80 },
+                 { field: "PackingListDate", title: "Packing Date", width: 80 },
+                 { command: [{ name: "DeletedRow", text: "Delete", imageClass: "k-icon k-i-close", click: handleDelete }], title: "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Delete", width: "70px", headerAttributes: { "class": "gridHeader", style: "font-weight: bold;font-size: 13px;text-align: center" } }
+            ]
+
+        }).data('kendoGrid');
+
+
+
+        /// Creating POP UP For Invoice Grid To Load
+        var PopupWindowInvoice = $("#PopupWindowInvoice").kendoWindow({
+            width: "70%",
+            height: "50%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+        function GetInvoiceList() {
+            $.ajax({
+                url: "/ShipmentInfo/GetProformaListForShipment",
+                type: 'POST',
+                data: ({ CommInvoiceFinalMstSlNo: $('#CommInvoiceFinalMstSlNo').val() }),
+                dataType: "JSON",
+                success: function (data) {
+                    $("#PopupWindowGridInvoice").data("kendoGrid").dataSource.data(data);
+                }
+            });
+        }
+
+        var GridForSearch = $("#PopupWindowGridInvoice").kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                schema: {
+                    model: {
+                        id: "ProformaInvoiceNo",
+                        fields: {
+                            ProformaInvoiceNo: { editable: false },
+                        }
+                    }
+                },
+
+            }),
+            selectable: "row",
+            sortable: true,
+            height: 250,
+            // groupable: true,
+            columns: [
+              { field: "ProformaInvoiceNo", title: "ProformaInvoiceNo" },
+              { field: "ProformaInvoiceDate", title: "ProformaInvoiceDate" },
+              { field: "PackingListSlNo", title: "PackingListSlNo" },
+              { field: "PackingListDate", title: "PackingListDate" },
+            ]
+        });
+
+
+        $('#PopupWindowGridInvoice').dblclick(function () {
+            var isTrue = 1;
+            var grid = $(this).data('kendoGrid');
+            var selectedItem = grid.dataItem(grid.select());
+            var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+            data = dataSource.data(); // Get Detail Grid Data
+            if (dataSource.hasChanges) {
+                for (var i = data.length - 1; i >= 0; i--) {
+                    if (data[i].ProformaInvoiceNo == selectedItem.ProformaInvoiceNo) {
+                        isTrue = 0;
+                        WarningMsg();
+                    }
+                }
+            }
+            if (isTrue == 1) {
+                var gridCiItem = $("#MainGrid").data("kendoGrid");
+                var selectedCiigItem = (gridCiItem.dataItem(gridCiItem.select()));
+                selectedCiigItem.set("ProformaInvoiceNo", selectedItem.ProformaInvoiceNo);
+                selectedCiigItem.set("ProformaInvoiceDate", selectedItem.ProformaInvoiceDate);
+                selectedCiigItem.set("PackingListSlNo", selectedItem.PackingListSlNo);
+                selectedCiigItem.set("PackingListDate", selectedItem.PackingListDate);
+            }
+
+            PopupWindowInvoice.close();
+        });
+
+        $(".btnMain").click(function (e) {
+            var Input = InputValidation('CommInvoiceNo');
+
+            if (Input == 0) {
+                AddRowToMainGrid();
+                e.preventDefault();
+            }
+        });
+
+        function AddRowToMainGrid() {
+            var addflag = 1; // For Row Add in Detail Grid using enter Key Press
+
+            var grid = $("#MainGrid").data("kendoGrid");
+
+            $("#MainGrid").data().kendoGrid.bind('dataBound', function () {
+                this.element.find('tbody tr:first').addClass('k-state-selected');
+            });
+            var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+            var addData = dataSource.data();
+            if (addData != null) { // For Add row when Exiting Data in Grid
+                for (var i = 0; i < addData.length; i++) {
+                    if (addData[i].val == "") {
+                        addflag = 0;
+                    }
+                }
+            }
+            if (addflag == 1) {
+                grid.addRow();
+            }
+        }
+
+
+        $('#PopupWindowGrid').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+            var selectRow = grid.dataItem(grid.select());
+            PopupWindow.close();
+            SetMasterData(selectRow);
+            //$("#SUStatus").val(1);
+        });
+
+        //Produc Name twise Filter table row
+        $("#txtPopupInput").keyup(function () {
+            var val = $(this).val();
+            $("#PopupWindowGrid").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                    { field: "CurrencyCode", operator: "contains", value: val },
+                    { field: "CurrencyName", operator: "contains", value: val },
+                    { field: "ShortName", operator: "contains", value: val },
+                    { field: "Status", title: "Status", width: 80 }
+                ]
+            });
+        });
+
+
+        $('#btnSave').click(function () {
+
+            var Input = InputValidation('CommInvoiceNo');
+
+            if (Input == 0) {
+                master.ShipmentMstSlNo = $('#ShipmentMstSlNo').val();
+                master.ShipmentDate = $('#ShipmentDate').val();
+                master.CommInvoiceNo = $('#CommInvoiceNo').val();
+                master.CommInvoiceDate = $('#CommInvoiceDate').val();
+                master.CountryCode = $('#CountryCode').val();
+                master.BuyerCode = $('#BuyerCode').val();
+                master.BlNo = $('#BlNo').val();
+                master.BlDate = $('#BlDate').val();
+                master.BlScanRef = $('#BlScanRef').val();
+                master.ExpNo = $('#ExpNo').val();
+                master.ExpDate = $('#ExpDate').val();
+                master.ExpScanRef = $('#ExpScanRef').val();
+                master.PaymentAdviceScanRef = $('#PaymentAdviceScanRef').val();
+                master.InsuranceStatus = $('#InsuranceStatus').val();
+                master.Remarks = $('#Remarks').val();
+
+                var PIDtls = $("#MainGrid").data("kendoGrid").dataSource;
+                data = PIDtls.data(); // Get Detail Grid Data
+                master.ShipmentDetailList = [];
+                if (PIDtls.hasChanges) {
+                    for (var i = data.length - 1; i >= 0; i--) {
+
+                        shipDetail.ShipmentDtlSlNo = data[i].ShipmentDtlSlNo;
+                        shipDetail.ShipmentMstSlNo = data[i].ShipmentMstSlNo;
+                        shipDetail.PackingListSlNo = data[i].PackingListSlNo;
+                        shipDetail.PackingListDate = data[i].PackingListDate;
+                        shipDetail.ProformaInvoiceNo = data[i].ProformaInvoiceNo;
+                        shipDetail.ProformaInvoiceDate = data[i].ProformaInvoiceDate;
+
+                        master.ShipmentDetailList.push(shipDetail);
+                        shipDetail = { "ShipmentDtlSlNo": "", "ShipmentMstSlNo": "", "PackingListSlNo": "", "PackingListDate": "", "ProformaInvoiceNo": "", "ProformaInvoiceDate": "" };
+                    }
+                }
+
+                var Dtls = $("#DetailGrid").data("kendoGrid").dataSource;
+                dtldata = Dtls.data(); // Get Detail Grid Data
+                master.ShipmentDocumentList = [];
+                if (PIDtls.hasChanges) {
+                    for (var i = data.length - 1; i >= 0; i--) {
+
+                        docDetails.ShipmentDocSlNo = dtldata[i].ShipmentDocSlNo;
+                        docDetails.ShipmentMstSlNo = dtldata[i].ShipmentMstSlNo;
+                        docDetails.DocumentName = dtldata[i].DocumentName;
+                        docDetails.DocumentRemarks = dtldata[i].DocumentRemarks;
+                        docDetails.DocRef = dtldata[i].DocRef;
+
+                        master.ShipmentDocumentList.push(docDetails);
+                        docDetails = { "ShipmentDocSlNo": "", "ShipmentMstSlNo": "", "DocumentName": "", "DocumentRemarks": "", "DocRef": "" };
+                    }
+                }
+
+                $.ajax({
+                    url: '/ShipmentInfo/OperationsMode',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.Status == "Yes") {
+                            $("#ShipmentMstSlNo").val(data.ID);
+                            OperationMsg(data.Mode);
+                        }
+                        else {
+                            ErrorFrmServerMsg(data.Status);
+                        }
+
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+            else {
+                ValidationMsg();
+            }
+
+        });
+
+        var master = { "ShipmentMstSlNo": "", "ShipmentDate": "", "CommInvoiceNo": "", "CommInvoiceDate": "", "CountryCode": "", "BuyerCode": "", "BlNo": "", "BlDate": "", "BlScanRef": "", "ExpNo": "", "ExpDate": "", "ExpScanRef": "", "PaymentAdviceScanRef": "", "InsuranceStatus": "", "Remarks": "", "ShipmentDetailList": [], "ShipmentDocumentList": [] };
+        var shipDetail = { "ShipmentDtlSlNo": "", "ShipmentMstSlNo": "", "PackingListSlNo": "", "PackingListDate": "", "ProformaInvoiceNo": "", "ProformaInvoiceDate": "" };
+        var docDetails = { "ShipmentDocSlNo": "", "ShipmentMstSlNo": "", "DocumentName": "", "DocumentRemarks": "", "DocRef": "" }
+
+        ////************************* To Chech UNSAVED Data in Details GRID ******************************//
+        //CheckUnSavedMasterData();
+
+
+
+        $('#BLScanDoc').on('change', function (e) {
+            var files = e.target.files;
+            //var myID = 3; //uncomment this to make sure the ajax URL works
+            if (files.length > 0) {
+                if (window.FormData !== undefined) {
+                    var data = new FormData();
+                    for (var x = 0; x < files.length; x++) {
+                        data.append("file" + x, files[x]);
+                    }
+
+                    $.ajax({
+                        type: "POST",
+                        url: '/ShipmentInfo/UploadBLDoc',
+                        contentType: false,
+                        processData: false,
+                        data: data,
+                        success: function (result) {
+                            $('#BlScanRef').val(result);
+                        },
+                        error: function (xhr, status, p3, p4) {
+                            var err = "Error " + " " + status + " " + p3 + " " + p4;
+                            if (xhr.responseText && xhr.responseText[0] == "{")
+                                err = JSON.parse(xhr.responseText).Message;
+                            console.log(err);
+                        }
+                    });
+                } else {
+                    alert("This browser doesn't support HTML5 file uploads!");
+                }
+            }
+        });
+
+        $('#ExpScanDoc').on('change', function (e) {
+            var files = e.target.files;
+            //var myID = 3; //uncomment this to make sure the ajax URL works
+            if (files.length > 0) {
+                if (window.FormData !== undefined) {
+                    var data = new FormData();
+                    for (var x = 0; x < files.length; x++) {
+                        data.append("file" + x, files[x]);
+                    }
+
+                    $.ajax({
+                        type: "POST",
+                        url: '/ShipmentInfo/UploadEXPDoc',
+                        contentType: false,
+                        processData: false,
+                        data: data,
+                        success: function (result) {
+                            $('#ExpScanRef').val(result);
+                            //alert($('#ExpScanRef').val());
+                        },
+                        error: function (xhr, status, p3, p4) {
+                            var err = "Error " + " " + status + " " + p3 + " " + p4;
+                            if (xhr.responseText && xhr.responseText[0] == "{")
+                                err = JSON.parse(xhr.responseText).Message;
+                            console.log(err);
+                        }
+                    });
+                } else {
+                    alert("This browser doesn't support HTML5 file uploads!");
+                }
+            }
+        });
+
+        $('#PaymentAdviceScanDoc').on('change', function (e) {
+            var files = e.target.files;
+            //var myID = 3; //uncomment this to make sure the ajax URL works
+            if (files.length > 0) {
+                if (window.FormData !== undefined) {
+                    var data = new FormData();
+                    for (var x = 0; x < files.length; x++) {
+                        data.append("file" + x, files[x]);
+                    }
+
+                    $.ajax({
+                        type: "POST",
+                        url: '/ShipmentInfo/UploadPaymentAdvice',
+                        contentType: false,
+                        processData: false,
+                        data: data,
+                        success: function (result) {
+                            $('#PaymentAdviceScanRef').val(result);
+                            //alert($('#PaymentAdviceScanRef').val());
+                        },
+                        error: function (xhr, status, p3, p4) {
+                            var err = "Error " + " " + status + " " + p3 + " " + p4;
+                            if (xhr.responseText && xhr.responseText[0] == "{")
+                                err = JSON.parse(xhr.responseText).Message;
+                            console.log(err);
+                        }
+                    });
+                } else {
+                    alert("This browser doesn't support HTML5 file uploads!");
+                }
+            }
+        });
+
+        $('#DocFile').on('change', function (e) {
+
+            var Input = InputValidation('DocName');
+
+            if (Input == 0) {
+                var files = e.target.files;
+                //var myID = 3; //uncomment this to make sure the ajax URL works
+                if (files.length > 0) {
+                    if (window.FormData !== undefined) {
+                        var data = new FormData();
+                        for (var x = 0; x < files.length; x++) {
+                            data.append("file" + x, files[x]);
+                        }
+                        $.ajax({
+                            type: "POST",
+                            url: '/ShipmentInfo/UploadOtherDoc',
+                            contentType: false,
+                            processData: false,
+                            data: data,
+                            success: function (result) {
+                                //$('#PaymentAdviceScanRef').val(result);
+                                //alert($('#PaymentAdviceScanRef').val());
+                                DetailGrid.dataSource.add({ DocumentName: $('#DocName').val(), DocumentRemarks: $('#DocRemarks').val(), DocRef: result });
+                            },
+                            error: function (xhr, status, p3, p4) {
+                                var err = "Error " + " " + status + " " + p3 + " " + p4;
+                                if (xhr.responseText && xhr.responseText[0] == "{")
+                                    err = JSON.parse(xhr.responseText).Message;
+                                console.log(err);
+                            }
+                        });
+                    } else {
+                        alert("This browser doesn't support HTML5 file uploads!");
+                    }
+                }
+            }
+        });
+
+        /************************************
+        *************Detail GRID*************
+        *************************************
+        ************************************/
+
+        //Initializing Main page details Kendo Grid Colums
+        var DetailGrid = $('#DetailGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "DocumentName",
+                        fields: {
+                            DocumentName: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            navigatable: false,
+            height: 230,
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "ShipmentDocSlNo", hidden: true },
+                 { field: "ShipmentMstSlNo", hidden: true },
+                 { field: "DocumentName", title: "Name", width: 80 },
+                 { field: "DocumentRemarks", title: "Remarks", width: 80 },
+                 { field: "DocRef", hidden: true },
+                 { command: [{ name: "DeletedRow", text: "Delete", imageClass: "k-icon k-i-close", click: handleDocDelete }], title: "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Delete", width: "70px", headerAttributes: { "class": "gridHeader", style: "font-weight: bold;font-size: 13px;text-align: center" } }
+            ]
+
+        }).data('kendoGrid');
+
+
+        //************************* Handling DELETE event for DELETING ROW from DETAIL GRID ******************************//
+        var dtlItem = {};
+
+        function handleDocDelete(event) {
+
+            var GridDtlView = $("#DetailGrid").data("kendoGrid");
+            dataitem = GridDtlView.dataItem(GridDtlView.select());
+            alert(dataitem.DocumentName)
+            // RemoveConfirmationDetail.open();
+        };
+
+        var RemoveConfirmationDetail = $('#RemoveConfirmationDetailWindow').kendoWindow({
+            width: "400px",
+            height: "100px",
+            draggable: false,
+            modal: true,
+            title: "Do You Want To Remove This Record?"
+        }).data("kendoWindow").center();
+
+
+        ////Handling Yes button click for master Delete Confirmation[Yes Button]
+        $('#btnRemoveConfirmationDetailYes').click(function () {
+            alert("");
+
+
+
+            DetailGrid.dataSource.remove(dtlItem);
+            RemoveConfirmationDetail.close();
+            OperationMsg();
+        });
+
+        //Handling No button click for grid row Delete Confirmation[No Button]
+        $('#btnRemoveConfirmationDetailNo').click(function () {
+            dataitem = {};
+            RemoveConfirmationDetail.close();
+        });
+    });
+
+</script>
+
+
+
+<div class="box-header with-border">
+    <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+    <div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+        <div style="text-align:right;">
+            <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>
+            <button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Save</button>
+            <button id="btnView" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-search"></i>Search</button>
+        </div>
+    </div>
+</div>
+<div class="box-body">
+
+    <div class="form-group">
+        <div class="row">
+            <div class="col-lg-3">Shipment Date:</div>
+            <div class="col-lg-3"><input type="text" id="ShipmentDate" name="ShipmentDate" class="form-control RequiredField date"></div>
+            <div class="col-lg-3"><input type="text" id="ShipmentMstSlNo" name="ShipmentMstSlNo" readonly="readonly" class="form-control"></div>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="row">
+            <div class="col-lg-3">Comercial Invoice No:</div>
+            <div class="col-lg-3">
+                <input type="hidden" id="CommInvoiceFinalMstSlNo" name="CommInvoiceFinalMstSlNo" class="form-control" />
+                <input type="text" id="CommInvoiceNo" name="CommInvoiceNo" class="form-control RequiredField" placeholder="Press F9">
+            </div>
+            <div class="col-lg-3">Comercial Invoice Date:</div>
+            <div class="col-lg-3">
+                <input type="text" id="CommInvoiceDate" name="CommInvoiceDate" readonly="readonly" class="form-control RequiredField">
+            </div>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Buyer Name: </div>
+            <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="BuyerName" name="BuyerName" readonly="readonly" class="form-control" /></div>
+            <input type="hidden" id="BuyerCode" name="BuyerCode" class="form-control" />
+
+            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Country: </div>
+            <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                <input type="text" id="CountryName" name="CountryName" readonly="readonly" class="form-control" />
+                <input type="hidden" id="CountryCode" class="form-control" />
+            </div>
+        </div>
+    </div>
+</div>
+<div class="panel-body">
+    <div class="row">
+        <div id="MainGrid" class="MainGrid" tabindex="14"></div>
+    </div>
+</div>
+
+
+<div class="panel panel-success">
+    <div class="panel-body">
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">BL No: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="BlNo" name="BlNo" class="form-control" /></div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">EXP No: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="ExpNo" name="ExpNo" class="form-control" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">BL Date: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="BlDate" name="BlDate" class="date form-control" /></div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">EXP Date: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="ExpDate" name="ExpDate" class="date form-control" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">BL Scan Copy: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="file" id="BLScanDoc" style="width:230px" name="BlScanRef" class="form-control"></div>
+                <input type="hidden" id="BlScanRef" class="form-control" />
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">EXP Scan Copy: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="file" id="ExpScanDoc" style="width:230px" name="ExpScanRef" class="form-control"></div>
+                <input type="hidden" id="ExpScanRef" class="form-control" />
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Insurance Status: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <select id="InsuranceStatus" class="form-control RequiredField ddlBox">
+                        <option value="Complete">Complete</option>
+                        <option value="Incomplete">Incomplete</option>
+                    </select>
+                </div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Payment Advice: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="file" id="PaymentAdviceScanDoc" style="width:230px" name="PaymentAdviceScanRef" class="form-control"></div>
+                <input type="hidden" id="PaymentAdviceScanRef" class="form-control" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel panel-success">
+    <div class="panel-body">
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-1 col-lg-2">Document Name: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-2">
+                    <select id="DocName" name="DocName" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+                <div class="col-xs-12 col-sm-6 col-md-1 col-lg-1">Remarks: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="DocRemarks" name="DocRemarks" class="form-control" placeholder="Remarks"></div>
+                <div class="col-xs-12 col-sm-6 col-md-1 col-lg-2">File: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-2"><input type="file" id="DocFile" style="width:10em;" name="DocFile" class="form-control"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div id="PopupWindow" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGrid" class="PopUpGrid"></div>
+    </div>
+    <div id="PopupWindowComIn" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridComIn" class="PopUpGrid"></div>
+    </div>
+    <div id="PopupWindowInvoice" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridInvoice" class="PopUpGrid"></div>
+    </div>
+</div>
+
+<div id="RemoveConfirmationMainWindow" class="modal">
+    <div class="modal-body">
+    </div>
+    <div class="modal-footer">
+        <input type="button" class="k-button hide-on-narrow" id="btnRemoveConfirmationMainYes" style="width:70px" value="Yes" />
+        <input type="button" class="k-button hide-on-narrow" id="btnRemoveConfirmationMainNo" style="width:70px" value="No" />
+    </div>
+</div>
+
+<div id="RemoveConfirmationDetailWindow" class="modal">
+    <div class="modal-body">
+    </div>
+    <div class="modal-footer">
+        <input type="button" class="k-button hide-on-narrow" id="btnRemoveConfirmationDetailYes" style="width:70px" value="Yes" />
+        <input type="button" class="k-button hide-on-narrow" id="btnRemoveConfirmationDetailNo" style="width:70px" value="No" />
+    </div>
+</div>
+
+<div class="panel-body">
+    <div class="row">
+        <div id="DetailGrid" class="DetailGrid" tabindex="14"></div>
+    </div>
+</div>

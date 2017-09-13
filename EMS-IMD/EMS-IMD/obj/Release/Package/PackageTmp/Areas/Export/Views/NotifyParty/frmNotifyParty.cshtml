@@ -1,0 +1,303 @@
+﻿
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+
+<script type="text/javascript">
+    $(document).ready(function () {
+
+        EventPermission();
+        $('#btnReset').click(function () {
+            ResetData();
+           // location.reload();
+        });
+
+        $('#btnView').click(function () {
+            PopupWindow.open();
+            $.ajax({
+                url: '/NotifyParty/GetNotifyParty',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGrid').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+                //complete: function () { },
+            });
+        });
+
+        /// Creating POP UP For the Buyer Grid To Load
+        var PopupWindowBuyer = $("#PopupWindowBuyer").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+
+        /// On Key pressing event in Buyer Selection Field
+        $("#BuyerName").on('keyup keypress keydown click dblclick', function (e) {
+            PopupWindowBuyer.open();
+            $.ajax({
+                url: '/BuyerInfo/GetBuyer',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridBuyer').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+
+        /// Creating GRID For Loading Buyer Information
+        var PopupGridBuyer = $('#PopupWindowGridBuyer').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "BuyerCode",
+                        fields: {
+                            BuyerCode: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "BuyerCode", title: "BuyerCode", width: 80, hidden: true },
+                 { field: "BuyerName", title: "BuyerName", width: 100 },
+                 { field: "Address", title: "Address", width: 80 }
+            ]
+
+        }).data('kendoGrid');
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridBuyer').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#BuyerCode').val(selectRow.BuyerCode);
+            $('#BuyerName').val(selectRow.BuyerName);
+            PopupWindowBuyer.close();
+        });
+
+        //Initializing Main page details Kendo Grid Colums
+        var PopupGrid = $('#PopupWindowGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "NotifyPartyCode",
+                        fields: {
+                            NotifyPartyCode: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            //selectable: "multiple",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            // groupable: true,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "NotifyPartyCode", title: "Notify Party Code", width: 80 },
+                 { field: "NotifyPartyName", title: "Notify Party Name", width: 100 },
+                 { field: "Address", title: "Address", width: 80 }
+            ]
+        }).data('kendoGrid');
+
+        $('#PopupWindowGrid').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+            var selectRow = grid.dataItem(grid.select());
+            PopupWindow.close();
+            SetMasterData(selectRow);
+        });
+
+        //Produc Name twise Filter table row
+        $("#txtPopupInput").keyup(function () {
+            var val = $(this).val();
+            $("#PopupWindowGrid").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "NotifyPartyCode", operator: "contains", value: val },
+                     { field: "NotifyPartyName", operator: "contains", value: val },
+                    { field: "Address", operator: "contains", value: val },
+                ]
+            });
+        });
+
+
+
+        $('#btnSave').click(function () {
+            var Input = InputValidation('NotifyPartyName')  + InputValidation('BuyerName');
+
+            if (Input == 0) {
+                master.BuyerCode = $('#BuyerCode').val();
+                master.BuyerName = $('#BuyerName').val();
+                master.Address = $('#Address').val();;
+                master.ContactPerson = $('#ContactPerson').val();
+                master.ContactNo = $('#ContactNo').val();
+                master.EmailID = $('#EmailID').val();
+                master.FaxNo = $('#FaxNo').val();
+                master.NotifyPartyCode = $('#NotifyPartyCode').val();
+                master.NotifyPartyName = $('#NotifyPartyName').val();
+                master.Status = $('#Status').val();
+
+                $.ajax({
+                    url: '/NotifyParty/OperationsMode',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.Status == "Yes") {
+                            $("#NotifyPartyCode").val(data.ID);
+                            OperationMsg(data.Mode);
+                        }
+                        else {
+                            ErrorFrmServerMsg(data.Status);
+                        }
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+            else {
+                ValidationMsg();
+            }
+        });
+        var master = { "NotifyPartyCode": "", "NotifyPartyName": "", "Address": "", "ContactNo": "", "EmailID": "", "ContactPerson": "", "FaxNo": "", "BuyerCode": "", "BuyerName": "", "Status": "" };
+    });
+</script>
+
+<div class="box-header with-border">
+    @*Form Title*@
+    <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+    <div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+        <div style="text-align:right;">
+            <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>
+            <button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Save</button>
+            <button id="btnView" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-search"></i>View</button>
+            @* <button id="btnDelete" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-trash"></i>Delete</button>*@
+        </div>
+    </div>
+</div>
+<div class="box-body">
+    <div class="form-horizontal">
+        @*Form Body Content*@
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Buyer Name:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3"><input type="text" id="BuyerName" name="BuyerName" placeholder="Press Any Key" class="RequiredField form-control" /></div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="BuyerCode" name="BuyerCode" class="RequiredField form-control" readonly="readonly" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Notify Party Name:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3"><input type="text" maxlength="150" id="NotifyPartyName" name="NotifyPartyName" placeholder="Notify Party Name" class="RequiredField form-control" /></div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="NotifyPartyCode" name="NotifyPartyCode" readonly="readonly" class="form-control" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Address:</div>
+                <div class="col-lg-9"><textarea id="Address" name="Address" maxlength="150" placeholder="Address" class="RequiredField form-control"></textarea></div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Contact No: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" maxlength="50" id="ContactNo" name="ContactNo" placeholder="Contact No" class="form-control" /></div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Contact Person:</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" maxlength="100" id="ContactPerson" name="ContactPerson" placeholder="Contact Person" class="form-control" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Fax No: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="FaxNo" maxlength="30" name="FaxNo" placeholder="Fax" class="form-control" /></div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Email:</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="EmailID" maxlength="30" name="EmailID" placeholder="Email" class="form-control" /></div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3"> Active Status:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="Status" name="Status" class="form-control">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="box-footer">@*Form Footer*@</div>
+<div class="row">
+    <div id="PopupWindow" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGrid" class="PopUpGrid"></div>
+    </div>
+
+    <div id="PopupWindowBuyer" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridBuyer" class="PopUpGrid"></div>
+    </div>
+</div>
+

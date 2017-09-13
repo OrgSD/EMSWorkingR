@@ -1,0 +1,232 @@
+﻿
+@{
+    ViewBag.Title = "frmGrid";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+
+<script type="text/javascript">
+    $(document).ready(function () {
+
+        //Initializing Main page details Kendo Grid Colums
+        var MainGrid = $('#MainGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: false,
+                schema: {
+                    model: {
+                        id: "SoftwareID",
+                        fields: {
+                            SoftwareID: { type: "string", editable: true, validation: { required: true }, defaultValue: "Press (F9)" },
+                            ModuleID: { type: "string", editable: true, validation: { required: true }, defaultValue: "01" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: true,
+            edit: function (e) {
+                $("[name='SoftwareID']", e.container).keyup(function (event) {
+                    if (event.keyCode == 120) {
+                        alert("Okay");
+                    }
+                });
+              
+
+            },
+            selectable: "row",
+            //selectable: "multiple",
+            toolbar: [{ text: "Add Items", className: "btnMainGrid", imageClass: "k-icon k-add", }, { template: "<input type='text' id='txtInput' style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+
+            navigatable: true,
+            height: 430,
+       
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+
+                 { field: "SoftwareID", title: "Menu Head ID" },
+                 { field: "SoftwareName", title: "Menu Head Name" },
+                 { field: "ModuleID", title: "SubHead ID", editable: true, editor: GetData },
+                 { field: "ModuleName", title: "SubHead Name" },
+       
+
+            ]
+
+        }).data('kendoGrid');
+
+        var cmbdt = [
+               { value: 'GAIN', text: 'GAIN' },
+               { value: 'LOSS', text: 'LOSS' },
+               { value: 'Replacement', text: 'Replacement' }
+
+
+        ];
+     
+        //function dt()
+        //{
+        //var seriesData = [];
+        //    $.ajax({
+        //        url: "/Grid/GetModule2",
+        //        type: 'GET',
+        //        dataType: 'JSON',
+        //        data: "{}",
+        //        contentType: "application/json; charset=utf-8",
+        //        success: function (data) {
+        //            var item = {};
+        //            for (var i = 0; i < data.length; i++) {                   
+                        
+        //                item["value"] = data[i].ModuleID;
+        //                item["text"] = data[i].ModuleName;                     
+
+        //                seriesData.push(item);
+        //                item = {};
+        //            }                  
+        //        },
+                
+        //    });
+        //}
+        function GetData(container, options) {
+            $('<input id="ModuleID"  data-text-field="text" data-value-field="value" data-bind="value:' + options.field + '"/>')
+                    .appendTo(container)
+                    .kendoDropDownList({
+                        dataTextField: "text",
+                        dataValueField: "value",
+                        change: function (e) {
+                           
+                        },
+                        dataSource: cmbdt
+                    });
+        }
+        
+        function GetData(container, options) {
+            $('<input id="ModuleID"  data-text-field="text" data-value-field="value" data-bind="value:' + options.field + '"/>')
+                .appendTo(container)
+                .kendoDropDownList({
+                    autoBind: true,
+                    dataSource: {
+                        transport: {
+                            read: {
+                                url: "/Grid/GetModule2",
+                                type: "GET"
+                            }
+                        }
+                    }
+                });
+        }
+       /*
+        function GetData(container, options) {
+            $('<input required data-text-field="ModuleName" data-value-field="ModuleID" data-bind="value:' + options.field + '"/>').appendTo(container).kendoDropDownList({
+                    autoBind: true,
+                    dataSource: {
+                        transport: {
+                            read: {
+                                dataType: "json",
+                                url: "/Grid/GetModule",
+                                type: "POST",
+                                change: onChange
+                            }
+                        }
+                    }
+            });
+
+        }
+
+        function onChange() {
+            var gridCiItem = $('#MainGrid').data('kendoGrid');
+            var selectedItem = (gridCiItem.dataItem(gridCiItem.select()));
+            var SoftwareID = selectedItem.SoftwareID;           
+            return SoftwareID;
+        }
+        */
+
+        $(".btnMainGrid").click(function () {    
+            DataAddToGrid();
+        });
+        function DataAddToGrid() {
+            var addflag = 1; // For Row Add in Detail Grid using enter Key Press
+            var parentFlag = 1; // For Row Add in Detail Grid using enter Key Press without Parent Data
+
+            if (parentFlag == 1) {
+                $("#MessageText").html("");
+                var grid = $("#MainGrid").data("kendoGrid");
+
+                $("#MainGrid").data().kendoGrid.bind('dataBound', function () {
+                    this.element.find('tbody tr:first').addClass('k-state-selected');
+                });
+                var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+                var addData = dataSource.data();
+                if (addData != null) { // For Add row when Exiting Data in Grid
+                    for (var i = 0; i < addData.length; i++) {
+                        if (addData[i].SoftwareName == "") {
+                            addflag = 0;
+                        }
+
+                    }
+                }
+                if (addflag == 1) {
+                    grid.addRow();
+                }
+            }
+        }
+        // Filter table row
+        $("#txtInput").keyup(function () {
+            var val = $(this).val();
+            $("#MainGrid").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "SoftwareID", operator: "contains", value: val },
+                     { field: "SoftwareName", operator: "contains", value: val },
+                     { field: "ModuleID", operator: "contains", value: val },
+                     { field: "ModuleName", operator: "contains", value: val },
+                    // { field: "IsActive", operator: "contains", value: val },
+
+                ]
+            });
+        });
+
+        var gridInput = 0;
+        function GridValidation() {
+            gridInput = 0;
+            var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+            data = dataSource.data(); // Get Detail Grid Data
+            if (dataSource.view().length > 0) {
+                gridInput = 0;
+            }
+            else {
+                gridInput = 1;
+            }
+        }
+
+
+    });
+    </script>
+
+<div class="box-header with-border">
+<div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+<div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+    <div style="text-align:right;">
+        <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>
+        <button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Save</button>
+    </div>
+</div>
+</div>
+
+<div class="box-body">
+
+
+<div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+        <div id="MainGrid" class="MainGrid"></div>
+    </div>
+</div>
+</div>

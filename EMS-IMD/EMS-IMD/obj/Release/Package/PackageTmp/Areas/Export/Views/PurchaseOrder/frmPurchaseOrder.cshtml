@@ -1,0 +1,837 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+
+<script type="text/javascript">
+    $(document).ready(function () {
+
+        EventPermission();
+        $('#btnReset').click(function () {
+            ResetData();
+
+            $('#MainGrid').data('kendoGrid').dataSource.filter([]);
+            $('#MainGrid').data('kendoGrid').dataSource.data([]);
+            $("select").each(function () { this.selectedIndex = 0 });
+            LoadBuyerDetails();
+        });
+
+
+        $("#txtAmount").kendoNumericTextBox({
+            format: "n",
+            decimals: 3
+        });
+
+        /************************************
+        ************* Main Grid *************
+        *************************************
+        *************************************/
+
+        var MainGrid = $('#MainGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: false,
+                schema: {
+                    model: {
+                        id: "ProductCode",
+                        fields: {
+                            ProductCode: { type: "string", editable: true, validation: { required: true } },
+                            NoOfPack: { type: "number", editable: true, validation: { required: true } },
+                            PricePerPack: { type: "number", editable: true, validation: { required: true } },
+                            ConversionRate: { type: "number", editable: true, validation: { required: true } },
+                            Amount: { type: "number", format: "{0:n2}", },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: true,
+            selectable: "row",
+            toolbar: [{ text: "Add Items", className: "btnMainGrid", imageClass: "k-icon k-add", }, { template: "<input type='text' id='txtInput' style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            edit: function (e) {
+                //----------
+                $(".CalculationNeeded").unbind().change(function () {
+                    var TotalRCVQuantity = 0.00;
+                    var PIGridDataSource = $("#MainGrid").data("kendoGrid").dataSource;
+                    var PIGridData = PIGridDataSource.data();
+                    for (i = PIGridData.length - 1; i >= 0; i--) {
+
+                        var tp = parseFloat(PIGridData[i].PricePerPack);
+                        var Qty = parseFloat(PIGridData[i].NoOfPack);
+
+                        TotalRCVQuantity = TotalRCVQuantity + (tp * Qty);
+                    }
+                    var TotalPIQuantityValue = $("#txtAmont").data("kendoNumericTextBox");
+                    TotalPIQuantityValue.value(TotalRCVQuantity);
+                });
+
+                $('input[name = "QtyPerPack"]').attr("readonly", true);
+                $('input[name = "PackSize"]').attr("readonly", true);
+                $('input[name = "CurrencyName"]').attr("readonly", true);
+                $('input[name = "PricePerPack"]').attr("readonly", true);
+                $('input[name = "ConversionRate"]').attr("readonly", false);
+
+                $("[name='NoOfPack']", e.container).blur(function () {
+                    var grid = $("#MainGrid").data("kendoGrid");
+                    var row = $(this).closest("tr");
+                    var Value = 0;
+
+                    var tp = parseFloat(grid.dataItem(row).PricePerPack);
+                    var Qty = parseFloat(grid.dataItem(row).NoOfPack);
+
+                    if (Qty != 0 && tp != 0) {
+                        var Value = (Qty * tp);
+                        if (!isNaN(Value)) {
+                            grid.dataItem(row).Amount = kendo.toString(Value, '0.00');
+                            $("#txtAmount").data("kendoNumericTextBox").value(Value)
+
+                        }
+                    }
+                });
+
+                e.container.find("NoOfPack").focus();
+            },
+            dataBound: function (e) {
+
+                var TotalRCVQuantity = 0.00;
+                var PIGridDataSource = $("#MainGrid").data("kendoGrid").dataSource;
+                var PIGridData = PIGridDataSource.data();
+                for (i = PIGridData.length - 1; i >= 0; i--) {
+
+                    var tp = parseFloat(PIGridData[i].PricePerPack);
+                    var Qty = parseFloat(PIGridData[i].NoOfPack);
+
+                    TotalRCVQuantity = TotalRCVQuantity + (tp * Qty);
+                }
+                var TotalPIQuantityValue = $("#txtAmount").data("kendoNumericTextBox");
+                TotalPIQuantityValue.value(TotalRCVQuantity);
+
+            },
+            save: function (e) {
+                e.sender.refresh();
+            },
+
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "PoMstSlno", hidden: true },
+                 { field: "PoDtlSlno", hidden: true },
+                 { field: "ProductCode", hidden: true },
+                 { field: "ProductName", title: "Product Name", editable: true, editor: GetProduct },
+                 { field: "CurrencyCode", hidden: true },
+                 { field: "CurrencyName", title: "Currency", editable: false, width: 100 },
+                 { field: "CompanyCode", hidden: true },
+                 { field: "PackSize", title: "Pack Size", editable: false, width: 100 },
+                 { field: "QtyPerPack", title: "Qty/Pack", editable: false, width: 100 },
+                 { field: "NoOfPack", title: "PO Qty", editable: true, attributes: { class: "CalculationNeeded" }, width: 100 },
+                 { field: "PricePerPack", title: "Rate", editable: true, width: 100 },
+                 { field: "Amount", title: "Amount", template: '#=kendo.toString((NoOfPack * PricePerPack),"n2")#', width: 120 },
+                 { field: "ConversionRate", title: "BDT Rate", editable: true, width: 120 },
+                 { command: [{ name: "DeletedRow", text: "Remove", click: handleDelete }], title: "Remove", width: "70px", headerAttributes: { "class": "gridHeader", style: "font-weight: bold;font-size: 13px;text-align: center" } }
+            ]
+
+        }).data('kendoGrid');
+
+        //************************* Handling DELETE event for DELETING ROW from DETAIL GRID ******************************//
+        var dataitem = {};
+        var GridName = null;
+        function handleDelete(event) {
+            event.preventDefault();
+            var GridView = $("#MainGrid").data("kendoGrid");
+            dataitem = (GridView.dataItem(GridView.select()));
+            GridName = MainGrid;
+            RemoveConfirmationMain.open();
+        };
+
+        var RemoveConfirmationMain = $('#RemoveConfirmationMainWindow').kendoWindow({
+            width: "400px",
+            height: "100px",
+            draggable: false,
+            modal: true,
+            title: "Do You Want To Remove This Record?"
+        }).data("kendoWindow").center();
+
+
+        ////Handling Yes button click for master Delete Confirmation[Yes Button]
+        $('#btnRemoveConfirmationMainYes').click(function () {
+            MainGrid.dataSource.remove(dataitem);
+            RemoveConfirmationMain.close();
+            OperationMsg();
+        });
+
+        //Handling No button click for grid row Delete Confirmation[No Button]
+        $('#btnRemoveConfirmationMainNo').click(function () {
+            dataitem = {};
+            RemoveConfirmationMain.close();
+        });
+
+        function GetProduct(container, options) {
+
+            $('<input name="ProductCode" data-bind="value:' + options.field + '"/>')
+                .appendTo(container)
+                .kendoDropDownList({
+                    autoBind: true,
+                    dataTextField: "ProductName",
+                    dataValueField: "ProductCode",
+                    optionLabel: "Select",
+                    dataSource: {
+                        transport: {
+                            read: {
+                                url: "/ProductInfo/GetProductListForPurchaseOrder",
+                                data: ({ PriceTypeCode: $('#PriceTypeCode').val(), OrderTypeCode: $('#OrderTypeCode').val() }),
+                                type: "post",
+                            }
+                        }
+                    },
+                    change: function (e) {
+                        var isTrue = 1;
+                        changeStatus = 1;
+                        var dataItem = e.sender.dataItem();
+
+                        var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+                        data = dataSource.data(); // Get Detail Grid Data
+                        if (dataSource.hasChanges) {
+                            for (var i = data.length - 1; i >= 0; i--) {
+                                if (data[i].ProductCode == dataItem.ProductCode) {
+                                    isTrue = 0;
+                                    WarningMsg();
+                                }
+                            }
+                        }
+                        if (isTrue == 1) {
+                            options.model.set("ProductName", dataItem.ProductName);
+                            options.model.set("ProductCode", dataItem.ProductCode);
+                            options.model.set("PackSize", dataItem.PackSize);
+                            options.model.set("QtyPerPack", dataItem.QtyPerPack);
+                            options.model.set("CompanyCode", dataItem.CompanyCode);
+                            options.model.set("CurrencyName", dataItem.CurrencyName);
+                            options.model.set("CurrencyCode", dataItem.CurrencyCode);
+                            options.model.set("PricePerPack", dataItem.PricePerPack);
+                            options.model.set("ConversionRate", $('#ConvRate').val());
+                        }
+                    },
+                });
+        }
+
+        // Filter table row
+        $("#txtInput").keyup(function () {
+            var val = $(this).val();
+            $("#MainGrid").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "ProductCode", operator: "contains", value: val },
+                     { field: "NoOfPack", operator: "contains", value: val },
+                     { field: "NoOfPcs", operator: "contains", value: val },
+                     { field: "PricePerPack", operator: "contains", value: val },
+                ]
+            });
+        });
+
+        var gridInput = 0;
+        function GridValidation() {
+            gridInput = 0;
+            var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+            data = dataSource.data(); // Get Detail Grid Data
+            if (dataSource.view().length > 0) {
+                gridInput = 0;
+            }
+            else {
+                gridInput = 1;
+            }
+        }
+
+        /************************************
+        **** Transport Mode Dropdown List ***
+        *************************************
+        *************************************/
+
+        getTransportMode();
+        function getTransportMode() {
+            $.ajax({
+                url: '/TransportMode/GetTransportMode',
+                method: 'get',
+                dataType: 'json',
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#TransportModeCode').append($('<option>', { value: item.TransportModeCode, html: item.TransportModeName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+        /************************************
+        ****** Destination Port Loading *****
+        *************************************
+        *************************************/
+       
+
+        function getPorts(TransportModeCode) {
+            $('#LoadingPortCode').empty();
+            $('#DestinationPortCode').empty();
+            $.ajax({
+                url: '/PurchaseOrder/GetPortListByTransportMode',
+                method: 'get',
+                dataType: 'json',
+                data: { transportModeCode: TransportModeCode },
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#DestinationPortCode').append($('<option>', { value: item.PortCode, html: item.PortName }, '<option/>'))
+                        $('#LoadingPortCode').append($('<option>', { value: item.PortCode, html: item.PortName }, '<option/>'))
+
+                    });
+                }
+            })
+        }
+
+        /************************************
+        ***** Order Type Dropdown List ******
+        *************************************
+        *************************************/
+
+        getOrderType();
+        function getOrderType() {
+            $.ajax({
+                url: '/General/GetOrderType',
+                method: 'get',
+                dataType: 'json',
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#OrderTypeCode').append($('<option>', { value: item.value, html: item.text }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+        /************************************
+        ****** Inco Term Dropdown List ******
+        *************************************
+        *************************************/
+
+        getIncoTermList();
+        function getIncoTermList() {
+            $.ajax({
+                url: '/IncoTermInfo/GetIncoTermInfo',
+                method: 'get',
+                dataType: 'json',
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#IncoTermCode').append($('<option>', { value: item.IncoTermCode, html: item.IncoTermName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+        /************************************
+        ***** Price Type Dropdown List ******
+        *************************************
+        *************************************/
+
+        getPriceType();
+        function getPriceType() {
+            $.ajax({
+                url: '/General/GetPriceType',
+                method: 'get',
+                dataType: 'json',
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#PriceTypeCode').append($('<option>', { value: item.value, html: item.text }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+
+        /************************************
+        ** Load Buyer Details on Form Load **
+        *************************************
+        *************************************/
+        LoadBuyerDetails();
+
+        function LoadBuyerDetails() {
+            $.ajax({
+                url: '/BuyerInfo/GetIndividualBuyer',
+                method: 'get',
+                data: 'json',
+                success: function (response) {
+                    if (response != "") {
+                        //$('#Email').val(response.EmailID);
+                        $('#BuyerCode').val(response.BuyerCode);
+                        $('#BuyerName').val(response.BuyerName);
+                        $('#CountryCode').val(response.CountryCode);
+                        $('#NotifyDays').val(response.NotificationDay);
+                        $('#TermsCondition').val(response.TermsCondition);
+                        $('#TermsOfPayment').val(response.TermsOfPayment);
+                    }
+                    else {
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        }
+
+        $("#TransportModeCode").change(function () {
+            getPorts($("#TransportModeCode").val());
+        });
+        $('#btnSave').click(function () {
+
+            var Input = InputValidation('OrderTypeCode') + InputValidation('IncoTermCode') + InputValidation('BuyerName') + InputValidation('PriceTypeCode') + InputValidation('DestinationPortCode') + InputValidation('LoadingPortCode') + InputValidation('PoDate');
+            GridValidation();
+
+            if (Input == 0 && gridInput == 0) {
+                var bdtTotal = 0;
+                var poTotal = 0;
+
+                master.PoMstSlno = $('#PoMstSlno').val();
+                master.PoNo = $('#PoNo').val();
+                master.PoDate = $('#PoDate').val();
+                master.BuyerName = $('#BuyerName').val();
+                master.BuyerCode = $('#BuyerCode').val();
+                master.CountryCode = $('#CountryCode').val();
+                // master.Email = $('#Email').val();
+                master.DeliveryDate = $('#DeliveryDate').val();
+                master.DeliveryAddress = $('#DeliveryAddress').val();
+                master.IncoTermCode = $('#IncoTermCode').val();
+                master.OrderTypeCode = $('#OrderTypeCode').val();
+                master.PriceTypeCode = $('#PriceTypeCode').val();
+                master.DestinationPortCode = $('#DestinationPortCode').val();
+                master.LoadingPortCode = $('#LoadingPortCode').val();
+                master.TransportModeCode = $('#TransportModeCode').val();
+                master.NotifyDays = $('#NotifyDays').val();
+                master.TermsCondition = $('#TermsCondition').val();
+                master.TermsOfPayment = $('#TermsOfPayment').val();
+                master.Remarks = $('#Remarks').val();
+                master.CurrencyCode = $('#CurrencyCode').val();
+                master.PoStatus = $('#PoStatus').val();
+
+                var PageDetailsdts = $("#MainGrid").data("kendoGrid").dataSource;
+                data = PageDetailsdts.data(); // Get Detail Grid Data
+                master.PODetailList = [];
+                if (PageDetailsdts.hasChanges) {
+                    for (var i = data.length - 1; i >= 0; i--) {
+
+                        details.PoDtlSlno = data[i].PoDtlSlno;
+                        details.PoMstSlno = data[i].PoMstSlno;
+                        details.ProductCode = data[i].ProductCode;
+                        details.CompanyCode = data[i].CompanyCode;
+                        details.CurrencyCode = data[i].CurrencyCode;
+                        details.NoOfPack = data[i].NoOfPack;
+                        details.NoOfPcs = (parseFloat(data[i].QtyPerPack) * parseFloat(data[i].NoOfPack)).toString();
+                        details.PricePerPack = data[i].PricePerPack;
+                        details.TotalAmount = (parseFloat(data[i].PricePerPack) * parseFloat(data[i].NoOfPack)).toString();
+                        details.ConversionRate = data[i].ConversionRate;
+                        details.TotalAmountBDT = parseFloat(details.TotalAmount) * parseFloat(data[i].ConversionRate);
+
+                        bdtTotal = parseFloat(bdtTotal) + parseFloat(details.TotalAmountBDT);
+                        poTotal = parseFloat(poTotal) + parseFloat(details.TotalAmount);
+
+                        master.PODetailList.push(details);
+                        details = { "PoDtlSlno": "", "PoMstSlno": "", "ProductCode": "", "ProductName": "", "NoOfPack": "", "NoOfPcs": "", "CompanyCode": "", "PricePerPack": "", "TotalAmount": "", "TotalAmountBDT": "", "ConversionRate": "" };
+                    }
+                }
+
+                else {
+                    ValidationMsg();
+                }
+
+                master.TotalPoAmount = poTotal.toString();
+                master.TotalPoAmountBDT = bdtTotal.toString();
+
+                $.ajax({
+                    url: '/PurchaseOrder/OperationsMode',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.Status == "Yes") {
+                            $("#PoNo").val(data.ID);
+                            $("#PoMstSlno").val(data.MaxCode);
+                            OperationMsg(data.Mode);
+                        }
+                        else {
+                            ErrorFrmServerMsg(data.Status);
+                        }
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+            else {
+                ValidationMsg();
+            }
+        });
+
+        var master = { "PoMstSlno": "", "PoNo": "", "PoDate": "", "BuyerCode": "", "BuyerName": "", "Email": "", "CountryCode": "", "CountryName": "", "DeliveryDate": "", "DeliveryAddress": "", "IncoTermCode": "", "IncoTermName": "", "OrderTypeCode": "", "OrderTypeName": "", "PriceTypeCode": "", "PriceTypeName": "", "DestinationPortCode": "", "DestinationPortName": "", "LoadingPortCode": "", "LoadingPortName": "", "TransportModeCode": "", "TransportModeName": "", "NotifyDays": "", "TermsCondition": "", "TermsOfPayment": "", "TotalPoAmount": "", "CurrencyCode": "", "CurrencyName": "", "Remarks": "", "TotalPoAmountBDT": "", "PoStatus" : "", "PODetailList": [] };
+        var details = { "PoDtlSlno": "", "PoMstSlno": "", "ProductCode": "", "ProductName": "", "NoOfPack": "", "NoOfPcs": "", "PricePerPack": "", "TotalAmount": "", "TotalAmountBDT": "", "ConversionRate": "" };
+
+        var gridInput = 0;
+
+        function GridValidation() {
+            gridInput = 0;
+            var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+            data = dataSource.data(); // Get Detail Grid Data
+            if (dataSource.view().length > 0) {
+                for (var i = data.length - 1; i >= 0; i--) {
+                    if ((data[i].ProductCode == "Press (F9)") || (data[i].ProductCode == "")) {
+                        gridInput = 1;
+                    }
+                    if (data[i].NoOfPack <= 0) {
+                        gridInput = 1;
+                    }
+                }
+            }
+            else {
+                gridInput = 1;
+            }
+        }
+
+        $(".btnMainGrid").click(function (e) {
+
+            var Input = InputValidation('OrderTypeCode') + InputValidation('PriceTypeCode') + InputValidation('ConvRate');
+
+            if (Input == 0) {
+                e.preventDefault();
+                DataAddToGrid();
+            }
+            else {
+                ValidationMsg();
+            }
+
+        });
+        function DataAddToGrid() {
+            var addflag = 1; // For Row Add in Detail Grid using enter Key Press
+            var parentFlag = 1; // For Row Add in Detail Grid using enter Key Press without Parent Data
+
+            if (parentFlag == 1) {
+                $("#MessageText").html("");
+                var grid = $("#MainGrid").data("kendoGrid");
+
+                $("#MainGrid").data().kendoGrid.bind('dataBound', function () {
+                    this.element.find('tbody tr:first').addClass('k-state-selected');
+                });
+                var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+                var addData = dataSource.data();
+                if (addData != null) { // For Add row when Exiting Data in Grid
+                    for (var i = 0; i < addData.length; i++) {
+                        if (addData[i].PoNo == "" || addData[i].ProductName == "" || addData[i].ProductName == "Select" || addData[i].NoOfPack == 0) {
+                            addflag = 0;
+                        }
+                    }
+                }
+                if (addflag == 1) {
+                    grid.addRow();
+                }
+            }
+        }
+
+        $('#btnView').click(function () {
+            PopupWindow.open();
+            $.ajax({
+                url: '/PurchaseOrder/GetPOList',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGrid').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+                //complete: function () { },
+            });
+        });
+
+
+        //Initializing Main page details Kendo Grid Colums
+        var PopupGrid = $('#PopupWindowGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "PoNo",
+                        fields: {
+                            PoNo: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            //selectable: "multiple",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            // groupable: true,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "PoNo", title: "PO No", width: 80 },
+                 { field: "PoDate", title: "PO Date", width: 100 },
+                 { field: "DeliveryDate", title: "Delivery Date", width: 80 },
+                 { field: "DestinationPortCode", title: "DestinationPortCode", hidden: true },
+                 { field: "LoadingPortCode", title: "LoadingPortCode", hidden: true },
+                 { field: "TransportModeCode", title: "TransportModeCode", hidden: true },
+
+            ]
+
+        }).data('kendoGrid');
+
+        $('#PopupWindowGrid').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+            var selectRow = grid.dataItem(grid.select());
+            PopupWindow.close();
+
+            SetMasterData(selectRow);
+
+            $("#TransportModeCode").val(selectRow.TransportModeCode);
+
+            getPorts($("#TransportModeCode").val());
+
+            $("#LoadingPortCode").val(selectRow.LoadingPortCode);
+            $("#DestinationPortCode").val(selectRow.DestinationPortCode);
+
+            LoadDetailsProduct(selectRow.PoMstSlno);
+        });
+       
+
+        function LoadDetailsProduct(value) {
+
+            $.ajax({
+                url: '/PurchaseOrder/GetPurchaseOrderDetails',
+                type: 'POST',
+                contentType: 'application/json;',
+                dataType: 'json',
+                data: JSON.stringify({ masterID: value }),
+                success: function (data) {
+                    if (data != "") {
+                        $('#MainGrid').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+
+        }
+
+        //Produc Name twise Filter table row
+        $("#txtPopupInput").keyup(function () {
+            var val = $(this).val();
+            $("#PopupWindowGrid").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "PoNo", operator: "contains", value: val },
+                     { field: "PoDate", operator: "contains", value: val },
+                     { field: "DeliveryDate", operator: "contains", value: val },
+                ]
+            });
+        });
+
+    });
+</script>
+
+<div class="box-header with-border">
+    @*Form Title*@
+    <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+    <div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+        <div style="text-align:right;">
+            <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>
+            <button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Save</button>
+            <button id="btnView" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-search"></i>View</button>
+            @* <button id="btnDelete" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-trash"></i>Delete</button>*@
+        </div>
+    </div>
+</div>
+
+<div class="box-body">
+    <div class="form-horizontal">
+        @*Form Body Content*@
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-3 col-md-2 col-lg-3">Buyer Name: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="BuyerName" name="BuyerName" placeholder="Buyer Name" class="RequiredField form-control" readonly="readonly" />
+                    <input type="hidden" id="BuyerCode" name="BuyerCode" class="form-control" />
+                    <input type="hidden" id="CountryCode" name="CountryCode" class="form-control" />
+                </div>
+                
+                <div class="col-xs-0 col-sm-3 col-md-2 col-lg-3">Purchase Order Date:</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-2"><input type="text" id="PoDate" name="PoDate" class="date RequiredField form-control" readonly="readonly" /><i class="fa fa-calendar form-control-feedback"></i></div>
+
+                <div class="col-xs-0 col-sm-0 col-md-2 col-lg-1">
+                    <input type="text" id="PoNo" name="PoNo" placeholder="PO No" readonly="readonly" class="RequiredField form-control" />
+                    <input type="hidden" id="PoMstSlno" name="PoMstSlno" class="form-control" />
+                </div>
+            </div>
+
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Order Type:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="OrderTypeCode" name="OrderTypeCode" class="RequiredField form-control"></select>
+                </div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Price Type: </div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="PriceTypeCode" name="PriceTypeCode" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group  has-feedback">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Delivery Date: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="DeliveryDate" name="DeliveryDate" class="date form-control" /><i class="fa fa-calendar form-control-feedback"></i></div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">INCO Term:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="IncoTermCode" name="IncoTermCode" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+
+                @*<div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Buyer Email: </div>
+                    <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="Email" name="Email" readonly="readonly" class="form-control" /></div>*@
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Delivery Address: </div>
+                <div class="col-lg-9"><textarea id="DeliveryAddress" name="DeliveryAddress" maxlength="150" class="RequiredField form-control"></textarea></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Transport Mode:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="TransportModeCode" name="TransportModeCode" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Noticing Period (Days): </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="NotifyDays" name="NotifyDays" placeholder="Noticing Period" maxlength="2" class="form-control" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Destination Port:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="DestinationPortCode" name="DestinationPortCode" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Loading Port:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="LoadingPortCode" name="LoadingPortCode" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Terms & Condition: </div>
+                <div class="col-lg-9"><textarea id="TermsCondition" name="TermsCondition" placeholder="Terms & Condition" maxlength="300" class="form-control"></textarea></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Payment Terms: </div>
+                <div class="col-lg-9"><textarea id="TermsOfPayment" name="TermsOfPayment" placeholder="Payment Terms" maxlength="300" class="form-control"></textarea></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Remarks: </div>
+                <div class="col-lg-9"><textarea id="Remarks" name="Remarks" placeholder="Remarks" maxlength="150" class="form-control"></textarea></div>
+            </div>
+        </div>
+
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Conversion Rate: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="ConvRate" name="ConvRate" maxlength="3" class="form-control" value="80" /></div>
+            
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Status:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="PoStatus" name="PoStatus" class="RequiredField form-control">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="box-footer">@*Form Footer*@</div>
+<div class="row">
+    <div id="PopupWindow" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGrid" class="PopUpGrid"></div>
+    </div>
+
+    <div id="PopupWindowBuyer" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridBuyer" class="PopUpGrid"></div>
+    </div>
+</div>
+
+<div class="row">
+    <div id="MainGrid" class="MainGrid"></div>
+    <label id="" style="margin-left:750px;">Amount:</label>
+    <input type="text" readonly="readonly" class="txtBox" id="txtAmount" style="width:100px;" />
+</div>
+
+<div id="RemoveConfirmationMainWindow" class="modal">
+    <div class="modal-body">
+    </div>
+    <div class="modal-footer">
+        <input type="button" class="k-button hide-on-narrow" id="btnRemoveConfirmationMainYes" style="width:70px" value="Yes" />
+        <input type="button" class="k-button hide-on-narrow" id="btnRemoveConfirmationMainNo" style="width:70px" value="No" />
+    </div>
+</div>

@@ -1,0 +1,926 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script src="~/AdminLTE/plugins/jQuery/jquery-2.2.3.min.js"></script>
+<link href="~/Content/CSS/InputText.css" rel="stylesheet" />
+
+<script type="text/javascript">
+
+    $(document).ready(function () {
+
+        $('#SAPSoDate').val("");
+
+        EventPermission();
+        $('#btnReset').click(function () {
+            ResetData();
+            //location.reload();
+            $('#MainGrid').data('kendoGrid').dataSource.filter([]);
+            $('#MainGrid').data('kendoGrid').dataSource.data([]);
+
+            $("select").each(function () { this.selectedIndex = 0 });
+        });
+
+        /************************************
+        ************* Main Grid *************
+        *************************************
+        *************************************/
+
+        var MainGrid = $('#MainGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: false,
+                schema: {
+                    model: {
+                        id: "ProductCode",
+                        fields: {
+                            ProductCode: { type: "string", editable: true, validation: { required: true } },
+                            TotalAmountBDT: { type: "number" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtInput' style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "ProInvDtlSlNo", hidden: true },
+                 { field: "ProInvMstSlNo", hidden: true },
+                 { field: "ProductCode", hidden: true },
+                 { field: "ProductName", title: "Product Name", },
+                 { field: "CurrencyCode", hidden: true },
+                 { field: "CurrencyName", title: "Currency" },
+                 { field: "CompanyCode", hidden: true },
+                 { field: "ConversionRate", hidden: true },
+                 { field: "TotalAmount", hidden: true },
+                 { field: "PackSize", title: "Pack Size", editable: false },
+                 { field: "QtyPerPack", title: "Qty/Pack", editable: false },
+                 { field: "NoOfPack", title: "PI Qty", editable: true },
+                 { field: "NoOfPcs", title: "Total PCs", editable: true },
+                 { field: "TotalAmountBDT", title: "Total BDT", format: '{0:0.00}' },
+            ]
+        }).data('kendoGrid');
+
+        // Filter table row
+        $("#txtInput").keyup(function () {
+            var val = $(this).val();
+            $("#MainGrid").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "ProductName", operator: "contains", value: val },
+                     { field: "NoOfPack", operator: "contains", value: val },
+                     { field: "NoOfPcs", operator: "contains", value: val },
+                     { field: "PricePerPack", operator: "contains", value: val },
+                ]
+            });
+        });
+
+        var gridInput = 0;
+        function GridValidation() {
+            gridInput = 0;
+            var dataSource = $("#MainGrid").data("kendoGrid").dataSource;
+            data = dataSource.data(); // Get Detail Grid Data
+            if (dataSource.view().length > 0) {
+                gridInput = 0;
+            }
+            else {
+                gridInput = 1;
+            }
+        }
+
+
+        function LoadDetailsProduct(PoNo) {
+
+            $.ajax({
+                url: '/PurchaseOrder/GetPurchaseDetails',
+                type: 'POST',
+                contentType: 'application/json;',
+                dataType: 'json',
+                data: JSON.stringify({ poNo: PoNo, companyCode: $('#CompanyCode').val() }),
+                success: function (data) {
+                    if (data != "") {
+                        $('#MainGrid').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        }
+
+        /************************************
+        ******* Company Dropdown List *******
+        *************************************
+        *************************************/
+
+        GetCompanyList();
+        function GetCompanyList() {
+            $.ajax({
+                url: '/CompanyInfo/GetCompany',
+                method: 'get',
+                dataType: 'json',
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#CompanyCode').append($('<option>', { value: item.CompanyCode, html: item.CompanyName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+        /************************************
+        ********* Bank Dropdown List ********
+        *************************************
+        *************************************/
+
+        GetBankInfo();
+        function GetBankInfo() {
+            $.ajax({
+                url: '/BankInfo/GetBankInfo',
+                method: 'get',
+                dataType: 'json',
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#BankCode').append($('<option>', { value: item.BankCode, html: item.BankName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+        /************************************
+        ******* Branch Dropdown List ********
+        *************************************
+        *************************************/
+
+        $('#BankCode').on('change', function () {
+            //alert(this.value);
+            document.getElementById("BranchCode").options.length = 0;
+            GetBranch();
+        })
+
+        function GetBranch() {
+            $.ajax({
+                url: '/General/GetBranchByBank',
+                type: 'POST',
+                contentType: 'application/json;',
+                dataType: 'json',
+                data: JSON.stringify({ bankCode: $('#BankCode').val() }),
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#BranchCode').append($('<option>', { value: item.BranchCode, html: item.BranchName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+
+        /************************************
+        **********POP UP BUYER GRID**********
+        *************************************
+        *************************************/
+
+        /// Creating POP UP For the Buyer Grid To Load
+        var PopupWindowBuyer = $("#PopupWindowBuyer").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+
+
+        /// On Key pressing event in Buyer Selection Field
+        $("#BuyerName").on('keyup keypress keydown dblclick', function (e) {
+            PopupWindowBuyer.open();
+            PopupWindowBuyer.center();
+            $.ajax({
+                url: '/BuyerInfo/GetBuyerForProforma',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGridBuyer').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+            });
+        });
+
+
+        /// Creating GRID For Loading Buyer Information
+        var PopupGridBuyer = $('#PopupWindowGridBuyer').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "BuyerCode",
+                        fields: {
+                            BuyerCode: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInputBuyer'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "BuyerCode", title: "Buyer Code", width: 80 },
+                 { field: "BuyerName", title: "Buyer Name", width: 100 },
+                 { field: "Address", title: "Address", width: 80 },
+                 { field: "CountryName", title: "Country", width: 100 },
+                 { field: "CountryCode", hidden: true },
+            ]
+
+        }).data('kendoGrid');
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridBuyer').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#BuyerCode').val(selectRow.BuyerCode);
+            $('#BuyerName').val(selectRow.BuyerName);
+            $('#CountryCode').val(selectRow.CountryCode);
+            $('#BuyerAddress').val(selectRow.Address);
+
+            $('#ConsigneeCode').empty()
+            $('#NotifyPartyCode').empty()
+            GetConsigneeList($('#BuyerCode').val());
+            GetNotifyPartyList($('#BuyerCode').val());
+            PopupWindowBuyer.close();
+        });
+
+        // Filter table row
+        $("#txtPopupInputBuyer").keyup(function () {
+            var val = $(this).val();
+            $("#PopupWindowGridBuyer").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "BuyerName", operator: "contains", value: val },
+                     { field: "Address", operator: "contains", value: val },
+                     { field: "CountryName", operator: "contains", value: val },
+                ]
+            });
+        });
+
+        /************************************
+        ****** Consignee Dropdown List ******
+        *************************************
+        *************************************/
+
+        function GetConsigneeList(buyerCode) {
+            $.ajax({
+                url: "/ConsigneeInfo/GetConsigneeByBuyer",
+                data: ({ BuyerCode: buyerCode }),
+                type: "post",
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#ConsigneeCode').append($('<option>', { value: item.ConsigneeCode, html: item.ConsigneeName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+
+         /************************************
+         **** Notify Party Dropdown List *****
+         *************************************
+         *************************************/
+
+        function GetNotifyPartyList(buyerCode) {
+            $.ajax({
+                url: "/NotifyParty/GetNotifyPartyByBuyer",
+                data: ({ BuyerCode: buyerCode }),
+                type: "post",
+                success: function (data) {
+                    $.each(data, function (i, item) {
+                        $('#NotifyPartyCode').append($('<option>', { value: item.NotifyPartyCode, html: item.NotifyPartyName }, '<option/>'))
+                    });
+                }
+            })
+        }
+
+        /************************************
+        **********POP UP PO No GRID**********
+        *************************************
+        *************************************/
+
+        /// Creating POP UP For the PO Grid To Load
+        var PopupWindowPO = $("#PopupWindowPO").kendoWindow({
+            width: "70%",
+            height: "70%",
+            draggable: true,
+            modal: true,
+            title: "List Of Values."
+        }).data("kendoWindow").center();
+
+        /// On Key pressing event in PO Selection Field
+        $("#PoNo").on('keyup keypress keydown dblclick', function (e) {
+
+            if ($('#CompanyCode').val() != null && $('#BuyerCode').val() != null) {
+
+                PopupWindowPO.open();
+                $('#PopupWindowGridPO').data('kendoGrid').dataSource.data([]);
+                $.ajax({
+                    url: "/PurchaseOrder/GetIndividualPO",
+                    data: ({ CompanyCode: $('#CompanyCode').val(), BuyerCode: $('#BuyerCode').val() }),
+                    type: "post",
+                    success: function (data) {
+                        if (data != "") {
+                            $('#PopupWindowGridPO').data('kendoGrid').dataSource.data(data);
+                        }
+                        else {
+                            PopupWindowPO.close();
+                            AcknowledgeMsg();
+                        }
+                    },
+                    error: function () {
+                        alert('Error occured!');
+                    },
+                });
+            }
+            else {
+                $('#PopupWindowGridPO').data('kendoGrid').dataSource.data([]);
+            }
+        });
+
+
+        /// Creating GRID For Loading PO Information
+        var PopupGridPO = $('#PopupWindowGridPO').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "PoNo",
+                        fields: {
+                            PoNo: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            toolbar: [{ template: "<input type='text' id='txtPopupInputPO'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+                 { field: "PoMstSlno", hidden: true },
+                 { field: "PoNo", title: "PO No", width: 80 },
+                 { field: "PoDate", title: "Date", width: 100 },
+                 { field: "IncoTermCode", hidden: true },
+                 { field: "IncoTermName", hidden: true },
+                 { field: "OrderTypeCode", hidden: true },
+                 { field: "OrderTypeName", hidden: true },
+                 { field: "PriceTypeCode", hidden: true },
+                 { field: "PriceTypeName", hidden: true },
+                 { field: "DestinationPortCode", hidden: true },
+                 { field: "DestinationPortName", hidden: true },
+                 { field: "LoadingPortCode", hidden: true },
+                 { field: "LoadingPortName", hidden: true },
+                 { field: "TransportModeCode", hidden: true },
+                 { field: "TransportModeName", hidden: true },
+                 { field: "NotifyDays", hidden: true },
+                 { field: "TermsOfPayment", hidden: true },
+            ]
+
+        }).data('kendoGrid');
+
+
+        // Filter table row
+        $("#txtPopupInputPO").keyup(function () {
+            var val = $(this).val();
+            $("#PopupWindowGridPO").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "PoNo", operator: "contains", value: val },
+                     { field: "PoDate", operator: "contains", value: val },
+                ]
+            });
+        });
+
+
+        /// On Grid Double Click, append data in appropriate field
+        $('#PopupWindowGridPO').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+
+            var selectRow = grid.dataItem(grid.select());
+            $('#PoNo').val(selectRow.PoNo);
+            $('#PoDate').val(selectRow.PoDate);
+            $('#IncoTermCode').val(selectRow.IncoTermCode);
+            $('#IncoTermName').val(selectRow.IncoTermName);
+            $('#OrderTypeCode').val(selectRow.OrderTypeCode);
+            $('#OrderTypeName').val(selectRow.OrderTypeName);
+            $('#PriceTypeCode').val(selectRow.PriceTypeCode);
+            $('#PriceTypeName').val(selectRow.PriceTypeName);
+            $('#DestinationPortCode').val(selectRow.DestinationPortCode);
+            $('#DestinationPortName').val(selectRow.DestinationPortName);
+            $('#LoadingPortCode').val(selectRow.LoadingPortCode);
+            $('#LoadingPortName').val(selectRow.LoadingPortName);
+            $('#TransportModeCode').val(selectRow.TransportModeCode);
+            $('#TransportModeName').val(selectRow.TransportModeName);
+            $('#NotifyDays').val(selectRow.NotifyDays);
+            $('#TermsOfPayment').val(selectRow.TermsOfPayment);
+            LoadDetailsProduct($('#PoNo').val());
+            PopupWindowPO.close();
+        });
+
+
+        $('#btnSave').click(function () {
+
+            var Input = InputValidation('CompanyCode') + InputValidation('BuyerName') + InputValidation('ConsigneeCode') + InputValidation('BankCode') + InputValidation('PoNo');
+
+            if (Input == 0) {
+                var bdtTotal = 0;
+                var poTotal = 0;
+
+                master.ProInvMstSlNo = $('#ProInvMstSlNo').val();
+                master.ProformaInvoiceNo = $('#ProformaInvoiceNo').val();
+                master.ProformaInvoiceDate = $('#ProformaInvoiceDate').val();
+                master.PoNo = $('#PoNo').val();
+                master.PoDate = $('#PoDate').val();
+                master.BuyerCode = $('#BuyerCode').val();
+                master.CompanyCode = $('#CompanyCode').val();
+                master.ConsigneeCode = $('#ConsigneeCode').val();
+                master.NotifyPartyCode = $('#NotifyPartyCode').val();
+                master.IncoTermCode = $('#IncoTermCode').val();
+                master.TransportModeCode = $('#TransportModeCode').val();
+                master.TransshipmentCode = $('#TransshipmentCode').val();
+                master.OrderTypeCode = $('#OrderTypeCode').val();
+                master.PriceTypeCode = $('#PriceTypeCode').val();
+                master.DestinationPortCode = $('#DestinationPortCode').val();
+                master.LoadingPortCode = $('#LoadingPortCode').val();
+                master.PartialShipment = $('#PartialShipment').val();
+                master.SAPSoNo = $('#SAPSoNo').val();
+                master.SAPSoDate = $('#SAPSoDate').val();
+                master.PaymentType = $('#PaymentType').val();
+                master.BankCode = $('#BankCode').val();
+                master.BranchCode = $('#BranchCode').val();
+                master.TermsOfPayment = $('#TermsOfPayment').val();
+                master.NotifyDays = $('#NotifyDays').val();
+                master.ApprovedStatus = $('#ApprovedStatus').val();
+                master.ApprovedRemarks = $('#ApprovedRemarks').val();   
+
+                master.Remarks = $('#Remarks').val();
+
+                var PageDetailsdts = $("#MainGrid").data("kendoGrid").dataSource;
+                data = PageDetailsdts.data(); // Get Detail Grid Data
+                master.ProformaDetailList = [];
+                if (PageDetailsdts.hasChanges) {
+                    for (var i = data.length - 1; i >= 0; i--) {
+
+                        details.ProductCode = data[i].ProductCode;
+                        details.CompanyCode = $('#CompanyCode').val();
+                        details.CurrencyCode = data[i].CurrencyCode;
+                        details.NoOfPack = data[i].NoOfPack;
+                        details.NoOfPcs = (parseFloat(data[i].QtyPerPack) * parseFloat(data[i].NoOfPack)).toString();
+                        details.PricePerPack = data[i].PricePerPack;
+                        details.TotalAmount = (parseFloat(data[i].PricePerPack) * parseFloat(data[i].NoOfPack)).toString();
+                        details.ConversionRate = data[i].ConversionRate;
+                        details.TotalAmountBDT = parseFloat(details.TotalAmount) * parseFloat(data[i].ConversionRate);
+
+                        bdtTotal = parseFloat(bdtTotal) + parseFloat(details.TotalAmountBDT);
+                        poTotal = parseFloat(poTotal) + parseFloat(details.TotalAmount);
+
+                        master.ProformaDetailList.push(details);
+                        details = { "ProInvDtlSlNo": "", "ProInvMstSlNo": "", "ProductCode": "", "ProductName": "", "CompanyCode": "", "CompanyName": "", "NoOfPack": "", "NoOfPcs": "", "PricePerPack": "", "ConversionRate": "", "CurrencyCode": "", "CurrencyName": "", "TotalAmount": "", "TotalAmountBDT": "" };
+                    }
+                }
+
+                else {
+                    ValidationMsg();
+                }
+
+                master.TotalPIAmount = poTotal.toString();
+                master.TotalPIAmountBDT = bdtTotal.toString();
+
+                $.ajax({
+                    url: '/ProformaInvoice/OperationsMode',
+                    data: JSON.stringify(master),
+                    type: 'POST',
+                    contentType: 'application/json;',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.Status == "Yes") {
+                            $("#ProformaInvoiceNo").val(data.ID);
+                            OperationMsg(data.Mode);
+                        }
+                        else {
+                            ErrorFrmServerMsg(data.Status);
+                        }
+                    },
+                    error: function () { ErrorFrmClientMsg(); },
+                    // complete: function () { CompletedMsg(); },
+                }); //End of ajax call
+            }
+        });
+
+        var master = { "ProInvMstSlNo": "", "ProformaInvoiceNo": "", "ProformaInvoiceDate": "", "PoNo": "", "PoDate": "", "BuyerCode": "", "BuyerName": "", "BuyerAddress": "", "CompanyCode": "", "CompanyName": "", "ConsigneeCode": "", "ConsigneeName": "", "OrderTypeCode": "", "OrderTypeName": "", "NotifyPartyCode": "", "NotifyPartyName": "", "PriceTypeCode": "", "PriceTypeName": "", "IncoTermCode": "", "IncoTermName": "", "DestinationPortCode": "", "DestinationPortName": "", "LoadingPortCode": "", "LoadingPortName": "", "SAPSoNo": "", "SAPSoDate": "", "TransportModeCode": "", "TransportModeName": "", "PartialShipment": "", "PaymentType": "", "BankCode": "", "BankName": "", "BranchCode": "", "BranchName": "", "TermsOfPayment": "", "NotifyDays": "", "TotalPIAmount": "", "TotalPIAmountBDT": "", "Remarks": "","ApprovedStatus" : "", "ApprovedRemarks" : "", "ProformaDetailList": [] };
+        var details = { "ProInvDtlSlNo": "", "ProInvMstSlNo": "", "ProductCode": "", "ProductName": "", "CompanyCode": "", "CompanyName": "", "NoOfPack": "", "NoOfPcs": "", "PricePerPack": "", "ConversionRate": "", "CurrencyCode": "", "CurrencyName": "", "TotalAmount": "", "TotalAmountBDT": "" };
+
+        $('#btnView').click(function () {
+            PopupWindow.open();
+            $.ajax({
+                url: '/ProformaInvoice/GetProformaInvoiceList',
+                method: 'get',
+                data: 'json',
+                success: function (data) {
+                    if (data != "") {
+                        $('#PopupWindowGrid').data('kendoGrid').dataSource.data(data);
+                    }
+                    else {
+                        PopupWindow.close();
+                        AcknowledgeMsg();
+                    }
+                },
+                error: function () {
+                    alert('Error occured!');
+                },
+                //complete: function () { },
+            });
+        });
+
+
+        //Initializing Main page details Kendo Grid Colums
+        var PopupGrid = $('#PopupWindowGrid').kendoGrid({
+            dataSource: new kendo.data.DataSource({
+                batch: true,
+                schema: {
+                    model: {
+                        id: "PoNo",
+                        fields: {
+                            PoNo: { type: "string" },
+                        }
+                    }
+                },
+                pageSize: 10,
+            }),
+            pageable: {
+                //refresh: true,
+                pageSizes: true, buttonCount: 5
+            },
+            scrollable: true,
+            sortable: true,
+            filterable: true,
+            editable: false,
+            selectable: "row",
+            //selectable: "multiple",
+            toolbar: [{ template: "<input type='text' id='txtPopupInput'  style='float:right' placeholder='Search...' class='k-textbox'>" }, ],
+            navigatable: true,
+            height: 430,
+            // groupable: true,
+            groupable: { messages: { empty: "Custom message text" } },
+            columnMenu: true,
+            reorderable: true,
+            resizable: true,
+            columns: [
+
+                 { field: "ProformaInvoiceNo", title: "Invoice No" },
+                 { field: "ProformaInvoiceDate", title: "Invoice Date" },
+                 { field: "PoNo", title: "PO No" },
+                 { field: "CompanyName", title: "Company" },
+                 { field: "BuyerName", title: "Buyer" },
+
+            ]
+
+        }).data('kendoGrid');
+
+        // Filter table row
+        $("#txtPopupInput").keyup(function () {
+            var val = $(this).val();
+            $("#MainGrid").data("kendoGrid").dataSource.filter({
+                logic: "or",
+                filters: [
+                     { field: "BuyerName", operator: "contains", value: val },
+                     { field: "PoNo", operator: "contains", value: val },
+                     { field: "CompanyName", operator: "contains", value: val },
+                ]
+            });
+        });
+
+        $('#PopupWindowGrid').dblclick(function () {
+            var grid = $(this).data('kendoGrid');
+            var selectRow = grid.dataItem(grid.select());
+            PopupWindow.close();
+            SetMasterData(selectRow);
+            LoadDetailsProduct(selectRow.PoNo);
+            GetConsigneeList(selectRow.BuyerCode);
+            $('#ConsigneeCode').val(selectRow.ConsigneeCode);
+            GetNotifyPartyList(selectRow.BuyerCode);
+            $('#NotifyPartyCode').val(selectRow.NotifyPartyCode);
+
+            document.getElementById("BranchCode").options.length = 0;
+            GetBranch();
+            $('#BranchCode').val(selectRow.BranchCode);
+        });
+
+        ///// On Key pressing event in Buyer Selection Field
+        //$("#ApprovedStatus").change(function (e) {
+
+        //    var app="ApprovedBy: "+  $('#ApprovedBy2').val();
+        //    if ($('#ApprovedStatus').val() == "Approved") {
+        //        $('#ApprovedBy').val(app);
+        //    }
+        //    else {
+        //        $('#ApprovedBy').val("");
+        //    }
+        //});
+    });
+
+
+</script>
+
+<div class="box-header with-border">
+    @*Form Title*@
+    <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4"> <div id="MessageText"></div></div>
+    <div class="col-xs-0 col-sm-0 col-md-8 col-lg-8">
+        <div style="text-align:right;">
+            <button id="btnReset" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-refresh"></i>Reset</button>
+            <button id="btnSave" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-save"></i>Save</button>
+            <button id="btnView" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-search"></i>View</button>
+            @* <button id="btnDelete" class="btn btn-primary btn-lg" type="button"><i class="glyphicon glyphicon-trash"></i>Delete</button>*@
+        </div>
+    </div>
+</div>
+
+<div class="box-body">
+    <div class="form-horizontal">
+        @*Form Body Content*@
+        <div class="form-group has-feedback">
+            <div class="row">
+                <input type="hidden" id="ProInvMstSlNo" name="ProInvMstSlNo" class="form-control" />
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Proforma Invoice Date:</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="ProformaInvoiceDate" name="ProformaInvoiceDate" class="date form-control" /><i class="fa fa-calendar form-control-feedback"></i></div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Proforma Invoice No:</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="ProformaInvoiceNo" name="ProformaInvoiceNo" placeholder="Proforma Invoice No" readonly="readonly" class="RequiredField form-control" /></div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Company Name:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="CompanyCode" name="CompanyCode" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Buyer Name: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="BuyerName" name="BuyerName" placeholder="Press F9" class="RequiredField form-control" /></div>
+                <input type="hidden" id="BuyerCode" name="BuyerCode" class="form-control" />
+                <input type="hidden" id="CountryCode" name="CountryCode" class="form-control" />
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Buyer Address: </div>
+                <div class="col-lg-9"><textarea id="BuyerAddress" name="BuyerAddress" maxlength="150" readonly="readonly" class="RequiredField form-control"></textarea></div>
+            </div>
+        </div>
+
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">PO No: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3"><input type="text" id="PoNo" name="PONo" placeholder="Press F9" class="RequiredField form-control" /></div>
+                <div class="col-lg-3">PO Date: </div>
+                <div class="col-lg-3"><input type="text" id="PoDate" readonly="readonly" name="PODate" class="form-control" /></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Consignee:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="ConsigneeCode" name="ConsigneeCode" class="RequiredField form-control">
+                    </select>
+                </div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Notify Party:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="NotifyPartyCode" name="NotifyPartyCode" class="RequiredField form-control">
+                    </select>
+                </div>
+
+
+            </div>
+        </div>
+
+        <div class="form-group  has-feedback">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Order Type:</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="OrderTypeName" readonly="readonly" name="OrderTypeName" class="form-control" />
+                    <input type="hidden" id="OrderTypeCode" name="OrderTypeCode" class="form-control" />
+                </div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">INCO Term:</div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="IncoTermName" name="IncoTermName" readonly="readonly" class="form-control" />
+                    <input type="hidden" id="IncoTermCode" name="IncoTermCode" readonly="readonly" class="form-control" />
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Destination Port:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <input type="text" id="DestinationPortName" name="DestinationPortName" readonly="readonly" class="form-control" />
+                    <input type="hidden" id="DestinationPortCode" name="DestinationPortCode" readonly="readonly" class="form-control" />
+                </div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Loading Port:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <input type="text" id="LoadingPortName" name="LoadingPortName" readonly="readonly" class="form-control" />
+                    <input type="hidden" id="LoadingPortCode" name="LoadingPortCode" readonly="readonly" class="form-control" />
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group  has-feedback">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Transport Mode: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="TransportModeName" name="TransportModeName" readonly="readonly" class="form-control" />
+                    <input type="hidden" id="TransportModeCode" name="TransportModeCode" readonly="readonly" class="form-control" />
+                </div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Invoice Validity: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="NotifyDays" name="NotifyDays" readonly="readonly" class="form-control" />
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group  has-feedback">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">SAP No: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="SAPSoNo" name="SAPSoNo" class="form-control" />
+                </div>
+
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">SAP Date: </div>
+                <div class="col-xs-0 col-sm-0 col-md-3 col-lg-3">
+                    <input type="text" id="SAPSoDate" name="SAPSoDate" class="date form-control" />
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Transshipment:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="TransshipmentCode" name="TransshipmentCode" class="form-control">
+                        <option value="Y">Yes</option>
+                        <option value="N">No</option>
+                    </select>
+                </div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Partial Shipment:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="PartialShipment" name="PartialShipment" class="form-control">
+                        <option value="Y">Yes</option>
+                        <option value="N">No</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Bank: </div>
+                <div class="col-lg-3">
+                    <select id="BankCode" name="BankCode" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+                <div class="col-lg-3">Branch: </div>
+                <div class="col-lg-3">
+                    <select id="BranchCode" name="BranchCode" class="RequiredField form-control">
+                        <option value=""></option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Payment Terms: </div>
+                <div class="col-lg-3"><textarea id="TermsOfPayment" name="TermsOfPayment" placeholder="Payment Terms" maxlength="300" class="form-control"></textarea></div>
+                <div class="col-lg-3">Remarks: </div>
+                <div class="col-lg-3"><textarea id="Remarks" name="Remarks" placeholder="Remarks" maxlength="150" class="form-control"></textarea></div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="row">
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Payment Type:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="PaymentType" name="PaymentType" class="RequiredField form-control">
+                        <option value="Prepaid">Prepaid</option>
+                        <option value="Collected">Collected</option>
+                    </select>
+                </div>
+                <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Approval Status:</div>
+                <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                    <select id="ApprovedStatus" name="ApprovedStatus" class="RequiredField form-control">
+                        <option value="">Not Approved</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Cancel">Cancel</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-lg-3">Approval Remarks: </div>
+                <div class="col-lg-9"><textarea id="ApprovedRemarks" name="ApprovedRemarks" placeholder="Approval Remarks" maxlength="50" class="form-control"></textarea></div>               
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="box-footer">@*Form Footer*@</div>
+<div class="row">
+    <div id="PopupWindow" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGrid" class="PopUpGrid"></div>
+    </div>
+
+    <div id="PopupWindowBuyer" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridBuyer" class="PopUpGrid"></div>
+    </div>
+
+    <div id="PopupWindowPO" class="PopupWindowLayout" style="display: none;">
+        <div id="PopupWindowGridPO" class="PopUpGrid"></div>
+    </div>
+
+</div>
+
+<div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+        <div id="MainGrid" class="MainGrid"></div>
+    </div>
+</div>
+<br />
+@*<div class="form-group">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Approved Status:</div>
+            <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                <select id="ApprovedStatus" name="ApprovedStatus" class="form-control">
+                    <option value="NotApproved">Not Approved</option>
+                    <option value="Approved">Approved</option>
+                </select>
+            </div>
+            <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                <input type="text" id="ApprovedBy" name="ApprovedBy" class="form-control" readonly="readonly" />
+                <input type="hidden" id="ApprovedBy2" name="ApprovedBy2" value="@Session["UserID"]" class="form-control" />
+            </div>
+            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">Approved Remarks:</div>
+            <div class="col-xs-0 col-sm-6 col-md-3 col-lg-3">
+                <textarea id="ApprovedRemarks" name="ApprovedRemarks" placeholder="Remarks" maxlength="150" class="form-control"></textarea>
+            </div>
+        </div>
+    </div>*@
